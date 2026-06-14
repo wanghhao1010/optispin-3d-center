@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [完整相容與時間顯示版]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [3D 動態雲點模型畫布完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -21,7 +21,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 強行綁定你提供的絕對正確 Database REST URL
+# 2. 強行綁定絕對正確 Database REST URL
 BASE_URL = "https://pwmijkkzufcqrnmodxap.supabase.co/rest/v1/"
 
 try:
@@ -32,7 +32,6 @@ except Exception as e:
     st.error("❌ 偵測到雲端 Secrets 設定缺失！請確認 Streamlit Cloud 配置。")
     st.stop()
 
-# 建立符合 Supabase REST API 的安全標頭
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -40,36 +39,16 @@ HEADERS = {
     "Prefer": "return=representation"
 }
 
-# 3. 核心 REST API 互動工人
 def fetch_cloud_assets():
-    """同時撈取新表格 optispin_assets 與舊表格 models 的資料，確保以前的雲點圖不丟失"""
-    all_assets = []
-    
-    # A. 撈取新表格資料
+    """撈取資料表數據"""
     try:
         url_new = f"{BASE_URL}optispin_assets?select=*&order=created_at.desc"
         res_new = requests.get(url_new, headers=HEADERS)
         if res_new.status_code == 200:
-            all_assets.extend(res_new.json())
+            return res_new.json()
+        return []
     except Exception:
-        pass
-
-    # B. 嘗試撈取舊表格資料（相容以前的雲點圖）
-    try:
-        url_old = f"{BASE_URL}models?select=*"
-        res_old = requests.get(url_old, headers=HEADERS)
-        if res_old.status_code == 200:
-            # 避免重複加入
-            existing_filenames = {item.get("filename") for item in all_assets if item.get("filename")}
-            for item in res_old.json():
-                if item.get("filename") not in existing_filenames:
-                    all_assets.append(item)
-    except Exception:
-        pass
-
-    # 依時間排序（如果沒有時間欄位則排最後）
-    all_assets.sort(key=lambda x: x.get("created_at", x.get("timestamp", "")), reverse=True)
-    return all_assets
+        return []
 
 # ============================================================================== #
 # 🎨 核心主網頁前端 UI 渲染
@@ -124,6 +103,9 @@ with tab1:
                     except Exception as mesh_err:
                         st.warning(f"⚠️ 幾何結構解析受限: {str(mesh_err)}")
 
+                # 將 3D 檔案編碼成 Base64 字串存入資料庫，供前端 3D 畫布隨時調用
+                base64_mesh = base64.b64encode(file_bytes).decode('utf-8')
+
                 with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
                     try:
                         prompt_analysis = f"""
@@ -156,6 +138,7 @@ with tab1:
                         "surface_area": float(area_val),
                         "volume": float(volume_val),
                         "ai_diagnosis": diagnosis_text,
+                        "filesize": base64_mesh,  # 🛠️ 把編碼好的 3D 資料大文字塞進 filesize 欄位當作快取
                         "created_at": datetime.now().isoformat()
                     }
                     
@@ -189,19 +172,37 @@ with tab1:
         if filtered_data:
             for item in filtered_data:
                 with st.container():
-                    # 🕒 解析並漂亮顯示時間（支援新舊表格的時間欄位格式）
-                    raw_time = item.get('created_at' if item.get('created_at') else 'timestamp', '')
+                    raw_time = item.get('created_at', '')
                     display_time = "未知時間"
                     if raw_time:
                         try:
-                            # 格式化 ISO 時間字串，只取到分鐘，讓畫面乾淨
                             dt = datetime.fromisoformat(raw_time.replace('Z', '+00:00'))
                             display_time = dt.strftime("%Y-%m-%d %H:%M")
                         except Exception:
-                            display_time = str(raw_time)[:16] # 發生錯誤時直接截取前16碼
+                            display_time = str(raw_time)[:16]
                     
                     st.markdown(f"#### 📄 檔案: {item.get('filename', '未命名資產')}")
-                    st.caption(f"🕒 上傳時間: {display_time}") # 顯示時間標籤
+                    st.caption(f"🕒 上傳時間: {display_time}")
+                    
+                    # 🛸 核心：3D 實體動態雲點畫布渲染核心
+                    mesh_b64 = item.get("filesize", "")
+                    if mesh_b64 and len(mesh_b64) > 100:
+                        try:
+                            # 建立前端 HTML5 網格渲染視窗
+                            html_canvas = f"""
+                            <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+                            <model-viewer 
+                                src="data:model/gltf-binary;base64,{mesh_b64}" 
+                                alt="OptiSpin 3D Scan" 
+                                auto-rotate 
+                                camera-controls 
+                                background-color="#111111"
+                                style="width: 100%; height: 280px; background-color: #1a1a1a; border-radius: 10px;">
+                            </model-viewer>
+                            """
+                            st.components.v1.html(html_canvas, height=290)
+                        except Exception as canvas_err:
+                            st.caption("🔺 3D 畫布初始化受限")
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -213,13 +214,8 @@ with tab1:
                     
                     if st.button(f"🗑️ 銷毀資產", key=f"del_{item.get('id')}_{item.get('filename')}"):
                         try:
-                            # 優先從新表格刪除，若找不到則從舊表格刪除
                             del_url_new = f"{BASE_URL}optispin_assets?id=eq.{item.get('id')}"
-                            res_del = requests.delete(del_url_new, headers=HEADERS)
-                            
-                            del_url_old = f"{BASE_URL}models?id=eq.{item.get('id')}"
-                            requests.delete(del_url_old, headers=HEADERS)
-                            
+                            requests.delete(del_url_new, headers=HEADERS)
                             st.toast(f"已從雲端銷毀")
                             time.sleep(0.5)
                             st.rerun()
