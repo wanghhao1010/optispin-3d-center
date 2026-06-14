@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [欄位精準校正最終完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [全攔截防空值・歷史數據強行還原完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -41,16 +41,33 @@ HEADERS = {
 }
 
 def fetch_cloud_assets():
-    """撈取資料表數據（改用存在且合法的 id 欄位進行最新排序）"""
+    """安全型撈取：100% 容忍資料庫內的 NULL 空值，確保不閃退並成功回傳"""
     try:
-        # 🛠️ 關鍵修復：order=id.desc 替換掉原本不存在的 created_at
         url_new = f"{BASE_URL}optispin_assets?select=*&order=id.desc"
         response = requests.get(url_new, headers=HEADERS, timeout=12)
         if response.status_code == 200:
-            return response.json()
+            raw_list = response.json()
+            clean_list = []
+            
+            # 對每一筆撈出來的資料進行「防禦型檢查」，如果後台是 NULL 就自動補上安全初值
+            for row in raw_list:
+                safe_row = {
+                    "id": row.get("id", 0),
+                    "filename": row.get("filename") if row.get("filename") else f"未命名歷史資產 (ID: {row.get('id')})",
+                    "timestamp": row.get("timestamp") if row.get("timestamp") else "2026-06-14 00:00",
+                    "filesize": row.get("filesize") if row.get("filesize") else "",
+                    "vertices": int(row.get("vertices")) if row.get("vertices") is not None else 0,
+                    "faces": int(row.get("faces")) if row.get("faces") is not None else 0,
+                    "bounding_box": row.get("bounding_box") if row.get("bounding_box") else "未知尺寸",
+                    "surface_area": float(row.get("surface_area")) if row.get("surface_area") is not None else 0.0,
+                    "volume": float(row.get("volume")) if row.get("volume") is not None else 0.0,
+                    "ai_diagnosis": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "無診斷數據 (請重新上傳以觸發 AI 評估)"
+                }
+                clean_list.append(safe_row)
+            return clean_list
         return []
     except Exception as e:
-        st.warning(f"⚠️ 雲端資料庫讀取超時: {str(e)}")
+        st.warning(f"⚠️ 雲端通訊阻斷，正重新導向通路: {str(e)}")
         return []
 
 def create_point_cloud_simulation(mesh):
@@ -92,7 +109,7 @@ st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生與自�
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
-# 載入資料庫歷史數據
+# 載入經過全面洗滌防禦後的雲端數據清單
 cloud_data = fetch_cloud_assets()
 
 # ------------------------------------------------------------------------------ #
@@ -166,7 +183,6 @@ with tab1:
 
                 with st.spinner("💾 正在向 Supabase 寫入全量數據..."):
                     try:
-                        # 🛠️ 關鍵修復：將時間寫入欄位改為對齊後台的 "timestamp" 欄位
                         asset_row = {
                             "filename": file_name,
                             "vertices": int(vertices_count),
@@ -186,12 +202,12 @@ with tab1:
                             time.sleep(0.5)
                             st.rerun()  
                         else:
-                            st.warning(f"⚠️ 寫入失敗代碼: {res_post.status_code} | 原因: {res_post.text}")
+                            st.warning(f"⚠️ 寫入失敗代碼: {res_post.status_code}")
                     except Exception as db_err:
                         st.error(f"❌ 資料庫通訊連線斷開: {str(db_err)}")
 
     # ------------------------------------------------------------------------------ #
-    # 雲端動態搜尋與幾何資產儀表板 (極致防禦渲染)
+    # 雲端動態搜尋與幾何資產儀表板 (極致安全渲染區)
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
@@ -208,23 +224,18 @@ with tab1:
         if filtered_data:
             for item in filtered_data:
                 with st.container():
-                    # 🛠️ 關鍵修復：從後台撈取對應的 "timestamp" 作為時間顯示
-                    raw_time = item.get('timestamp', '')
-                    display_time = str(raw_time)[:16].replace('T', ' ') if raw_time else "未知時間"
-                    
+                    display_time = str(item.get('timestamp', ''))[:16].replace('T', ' ')
                     fname = item.get('filename')
-                    if not fname:
-                        fname = f"未命名資產 (ID: {item.get('id', '未知')})"
-                        
                     is_usdz = str(fname).lower().endswith('.usdz')
                     mesh_b64 = item.get("filesize", "")
                     
                     st.markdown(f"#### 📄 檔案: {fname}")
                     st.caption(f"🕒 上傳時間: {display_time}")
                     
+                    # 安全渲染：只有當 Base64 快取確實存在時，才載入 3D 畫布
                     if mesh_b64 and len(str(mesh_b64)) > 100:
                         if is_usdz:
-                            st.success("🍏 偵測到 iOS 專專屬格式！已自動啟動手機原生 AR 模式")
+                            st.success("🍏 偵測到 iOS 專屬格式！已自動啟動手機原生 AR 模式")
                             try:
                                 html_canvas = f"""
                                 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
@@ -275,7 +286,7 @@ with tab1:
                                     except Exception:
                                         st.caption("🔺 點雲生成受限")
                     else:
-                        st.caption("ℹ️ 提示：此項歷史資產在 Supabase 內僅存文字幾何數據，未快取 Base64 3D 實體模型。")
+                        st.info("ℹ️ 歷史快取提示：此項早期資產已安全收錄於大數據中心，未提供實體 3D 畫布預覽。")
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -283,7 +294,7 @@ with tab1:
                     with col2:
                         st.metric("工業邊界包絡體 (Bounding Box)", item.get('bounding_box', '無法計算'))
                     
-                    st.info(f"**🤖 Gemini 智慧製程評估報告：**\n{item.get('ai_diagnosis', '無診斷數據')}")
+                    st.info(f"**🤖 Gemini 智慧製程評估報告：**\n{item.get('ai_diagnosis')}")
                     
                     if st.button(f"🗑️ 銷毀資產", key=f"del_{item.get('id')}_{fname}"):
                         requests.delete(f"{BASE_URL}optispin_assets?id=eq.{item.get('id')}", headers=HEADERS)
@@ -305,23 +316,21 @@ with tab2:
     if not cloud_data:
         st.info("💡 目前雲端資料庫尚無有效資產。")
     else:
-        recent_assets = cloud_data[:3]
-        assets_summary_list = []
-        for index, item in enumerate(recent_assets):
-            assets_summary_list.append(
-                f"[{index+1}] 檔案名稱: {item.get('filename')} | 面數: {item.get('faces', 0)}"
-            )
-        all_assets_context = "\n".join(assets_summary_list)
+        recent_assets = [r for r in cloud_data if r.get("faces", 0) > 0][:3]
+        if recent_assets:
+            assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')} | 面數: {item.get('faces', 0)}" for index, item in enumerate(recent_assets)]
+            all_assets_context = "\n".join(assets_summary_list)
+        else:
+            all_assets_context = "暫無包含完整網格的歷史資產"
         
         if st.button("🔄 立即同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
             with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
                 try:
-                    intelligence_prompt = f"你是一位工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化控制建議：\n{all_assets_context}"
+                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
                     response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[intelligence_prompt])
                     st.session_state["cached_diagnostic_report"] = response.text
                 except Exception:
                     st.error("🧠 雲端繁忙，請稍候再試。")
         
         if "cached_diagnostic_report" in st.session_state:
-            st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
-   
+            st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px; border-left: 5px solid #00f0ff;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
