@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [HTML5 原生直連發射通道・終極大圓滿完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [欄位絕對對齊・無瑕通車完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -42,9 +42,10 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 核心降載防禦：僅抓取輕量純文字元數據，徹底終結 Timeout"""
+    """🚀 核心降載防禦：對齊你資料表真正的欄位（dimensions, ai_report）"""
     try:
-        fields = "id,filename,timestamp,vertices,faces,bounding_box,surface_area,volume,ai_diagnosis,filesize"
+        # 🔍 核心關鍵：這裡的欄位名稱必須跟你的 SQL 結構一模一樣！
+        fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_report,vertices,faces"
         url_new = f"{BASE_URL}optispin_assets?select={fields}&order=id.desc"
         response = requests.get(url_new, headers=HEADERS, timeout=8)
         
@@ -53,6 +54,7 @@ def fetch_lightweight_assets():
             clean_list = []
             for row in raw_list:
                 file_url = row.get("filesize", "")
+                # 如果是全新的 Storage 網址通路則放行展示
                 if str(file_url).startswith("http"):
                     safe_row = {
                         "id": row.get("id", 0),
@@ -60,8 +62,8 @@ def fetch_lightweight_assets():
                         "timestamp": row.get("timestamp", "2026-06-14 00:00"),
                         "vertices": int(row.get("vertices")) if row.get("vertices") is not None else 0,
                         "faces": int(row.get("faces")) if row.get("faces") is not None else 0,
-                        "bounding_box": row.get("bounding_box", "未知尺寸"),
-                        "ai_diagnosis": row.get("ai_diagnosis", "無診斷數據"),
+                        "dimensions": row.get("dimensions", "未知尺寸"),
+                        "ai_report": row.get("ai_report", "無診斷數據"),
                         "filesize": file_url
                     }
                     clean_list.append(safe_row)
@@ -69,6 +71,25 @@ def fetch_lightweight_assets():
         return []
     except Exception:
         return []
+
+def upload_to_supabase_storage(file_name, file_bytes):
+    """📦 儲存桶發射器：將 3D 實體檔案直接推上 Supabase Storage models 儲存桶"""
+    timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+    unique_filename = f"{timestamp_prefix}_{file_name}"
+    upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
+    
+    storage_headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/octet-stream"
+    }
+    try:
+        res = requests.post(upload_url, headers=storage_headers, data=file_bytes, timeout=30)
+        if res.status_code in [200, 201]:
+            return f"{STORAGE_URL}{unique_filename}"
+        return ""
+    except Exception:
+        return ""
 
 # ============================================================================== #
 # 🎨 核心主網頁前端 UI 渲染
@@ -86,95 +107,83 @@ cloud_data = fetch_lightweight_assets()
 # 分頁一：3D 大數據資產管理端
 # ------------------------------------------------------------------------------ #
 with tab1:
-    st.subheader("📥 點擊下方選取 3D 實體圖檔 (HTML5 手機原生直傳流道)")
+    st.subheader("📥 點擊或拖曳上傳全新 3D 掃描模型")
+    uploaded_file = st.file_uploader(
+        "支援工業幾何格式 (GLB/USDZ/OBJ/STL)", type=["glb", "obj", "usdz", "stl"], label_visibility="collapsed"
+    )
     
-    # ⚡ 利用 HTML5 原生瀏覽器發射器，直接把檔案從 iPhone 塞進 Supabase 儲存桶，100% 繞過 Streamlit 卡訊號的硬傷！
-    timestamp_id = datetime.now().strftime("%Y%m%d%H%M%S")
-    
-    html_uploader_code = f"""
-    <div style="font-family: sans-serif; background: #262730; padding: 15px; border-radius: 10px; border: 1px dashed #464855; text-align: center;">
-        <input type="file" id="fileInput" accept=".usdz,.glb,.obj,.stl" style="display: none;" onchange="startDirectUpload()" />
-        <button id="uploadBtn" onclick="document.getElementById('fileInput').click()" style="background: #ff4b4b; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 15px;">
-            📱 選擇手機 3D 掃描實體檔案並直接上傳
-        </button>
-        <div id="statusText" style="color: #aaa; font-size: 13px; margin-top: 10px;">支援工業格式：USDZ, GLB, OBJ, STL</div>
-    </div>
+    if uploaded_file is not None:
+        st.info(f"📦 檔案已就緒：{uploaded_file.name} ({uploaded_file.size/1024/1024:.2f} MB)")
+        
+        # 🛠️ 實體防呆同步按鈕：強制打破手機瀏覽器的網訊號凍結鎖
+        if st.button("🚀 點擊確認：啟動雲端大數據同步", type="primary", use_container_width=True, key="force_upload_trigger_btn"):
+            
+            with st.status("🛸 雲端數位雙生大數據同步中...", expanded=True) as status:
+                try:
+                    file_bytes = uploaded_file.read()
+                    file_name = uploaded_file.name
+                    file_extension = os.path.splitext(file_name)[1].lower()
+                    
+                    vertices_count, faces_count = 0, 0
+                    bounding_box_str = "150.0 x 150.0 x 150.0 mm"
+                    
+                    st.write("📐 正在解析 3D 拓撲網格與邊界包絡體...")
+                    if file_extension in [".obj", ".stl", ".glb"]:
+                        try:
+                            file_stream = io.BytesIO(file_bytes)
+                            scene_or_mesh = trimesh.load(file_stream, file_type=file_extension.strip('.'))
+                            mesh = list(scene_or_mesh.geometry.values())[0] if isinstance(scene_or_mesh, trimesh.Scene) else scene_or_mesh
+                            if mesh is not None:
+                                vertices_count = len(mesh.vertices)
+                                faces_count = len(mesh.faces)
+                                bbox = mesh.bounding_box.extents * 1000.0
+                                bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
+                        except Exception: pass
+                    elif file_extension == ".usdz":
+                        vertices_count, faces_count = 45000, 90000
+                        bounding_box_str = "180.0 x 120.0 x 160.0 mm (iOS AR 預估尺寸)"
+                    
+                    st.write("📦 正在將 3D 實體二進位圖檔上傳至工業儲存桶 (Storage)...")
+                    model_url = upload_to_supabase_storage(file_name, file_bytes)
+                    if not model_url:
+                        st.error("❌ 儲存桶寫入失敗！")
+                        st.stop()
 
-    <script>
-    async function startDirectUpload() {{
-        const fileInput = document.getElementById('fileInput');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const statusText = document.getElementById('statusText');
-        
-        if (!fileInput.files.length) return;
-        const file = fileInput.files[0];
-        
-        uploadBtn.disabled = true;
-        uploadBtn.style.background = '#444';
-        uploadBtn.innerText = "⚡ 正在繞過伺服器，直接空投雲端中...";
-        statusText.innerHTML = "正在全速上傳 " + (file.size/1024/1024).toFixed(2) + " MB 實體圖檔...";
-        
-        const uniqueName = "{timestamp_id}_" + file.name;
-        const uploadUrl = "https://{PROJECT_REF}.supabase.co/storage/v1/object/models/" + uniqueName;
-        
-        try {{
-            // 1. 直連發射到 Supabase Storage
-            const storageRes = await fetch(uploadUrl, {{
-                method: 'POST',
-                headers: {{
-                    'apikey': '{SUPABASE_KEY}',
-                    'Authorization': 'Bearer {SUPABASE_KEY}',
-                    'Content-Type': 'application/octet-stream'
-                }},
-                body: file
-            }});
-            
-            if (!storageRes.ok) throw new Error("儲存桶上傳拒絕");
-            
-            statusText.innerHTML = "💾 實體上傳成功！正在登錄精密資產元數據...";
-            const filePublicUrl = "{STORAGE_URL}" + uniqueName;
-            
-            // 2. 自動計算虛擬網格並寫入資料庫
-            const assetRow = {{
-                filename: file.name,
-                vertices: 45000,
-                faces: 90000,
-                bounding_box: "180.0 x 120.0 x 160.0 mm (iOS 原生解析)",
-                surface_area: 0.0,
-                volume: 0.0,
-                ai_diagnosis: "手機直連串流完畢。已調度邊界回報系統進行 PLA/PETG 列印優化評估。",
-                filesize: filePublicUrl,
-                timestamp: new Date().toISOString()
-            }};
-            
-            const dbRes = await fetch("{BASE_URL}optispin_assets", {{
-                method: 'POST',
-                headers: {{
-                    'apikey': '{SUPABASE_KEY}',
-                    'Authorization': 'Bearer {SUPABASE_KEY}',
-                    'Content-Type': 'application/json'
-                }},
-                body: JSON.stringify(assetRow)
-            }});
-            
-            if (dbRes.ok) {{
-                statusText.innerHTML = "🎉 數位雙生同步成功！正在重整儀表板...";
-                setTimeout(() => {{
-                    window.parent.location.reload();
-                }}, 800);
-            }} else {{
-                statusText.innerHTML = "❌ 資料表寫入失敗";
-            }}
-        }} catch(err) {{
-            statusText.innerHTML = "❌ 上傳異常: " + err.message;
-            uploadBtn.disabled = false;
-            uploadBtn.style.background = '#ff4b4b';
-            uploadBtn.innerText = "重新選擇檔案上傳";
-        }}
-    }}
-    </script>
-    """
-    st.components.v1.html(html_uploader_code, height=120)
+                    st.write("🤖 正在調度 Gemini 專家系統進行 FDM 生成式工藝評估...")
+                    try:
+                        prompt_analysis = f"工件檔名 {file_name}，網格面數 {faces_count}，換算尺寸 {bounding_box_str}。請給予 100 字內 FDM PLA/PETG 列印建議。"
+                        ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
+                        diagnosis_text = ai_response.text
+                    except Exception: 
+                        diagnosis_text = "工件收錄成功。"
+
+                    st.write("💾 正在向雲端資料表寫入精密對齊數據...")
+                    # 💡 【核心重擊修復】：這裡的 Key 必須百分之百完美對齊你的資料表欄位名稱！
+                    asset_row = {
+                        "filename": file_name, 
+                        "vertices": int(vertices_count), 
+                        "faces": int(faces_count),
+                        "dimensions": bounding_box_str,  # 🎯 完美對齊你的資料表欄位！
+                        "ai_report": diagnosis_text,    # 🎯 完美對齊你的資料表欄位！
+                        "filesize": model_url,            # 存入 Storage 公開網址
+                        "file_path": file_name,
+                        "timestamp": datetime.now().isoformat() 
+                    }
+                    
+                    res_db = requests.post(f"{BASE_URL}optispin_assets", headers=HEADERS, json=asset_row, timeout=15)
+                    
+                    if res_db.status_code in [200, 201]:
+                        status.update(label="🎉 雲端數位雙生大功告成！", state="complete", expanded=False)
+                        st.success(f"🎉 {file_name} 已成功格式化並存入雲端中心！")
+                        time.sleep(1.0)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ 資料表寫入拒絕！狀態碼: {res_db.status_code} | 回傳: {res_db.text}")
+                        st.stop()
+                        
+                except Exception as ex_main:
+                    st.error(f"❌ 流程異常中斷: {str(ex_main)}")
+                    st.stop()
 
     # ------------------------------------------------------------------------------ #
     # 🔍 3D 雲端資產搜尋儀表板 (靜態 URL 渲染通道)
@@ -185,7 +194,7 @@ with tab1:
     search_query = st.text_input("搜尋資產名稱", placeholder="輸入關鍵字篩選...", key="main_search_input", label_visibility="collapsed")
     
     if cloud_data:
-        filtered_data = [r for r in cloud_data if search_query.lower() in str(r.get("filename", "")).lower() or search_query.lower() in str(r.get("ai_diagnosis", "")).lower()]
+        filtered_data = [r for r in cloud_data if search_query.lower() in str(r.get("filename", "")).lower() or search_query.lower() in str(r.get("ai_report", "")).lower()]
         if filtered_data:
             for item in filtered_data:
                 with st.container():
@@ -200,8 +209,8 @@ with tab1:
                     canvas_slot = st.container()
                     col1, col2 = st.columns(2)
                     with col1: st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
-                    with col2: st.metric("工業邊界包絡體 (Bounding Box)", item.get('bounding_box', '無法計算'))
-                    st.info(f"🤖 Gemini 智慧評估報告：\n{item.get('ai_diagnosis')}")
+                    with col2: st.metric("工業邊界包絡體 (Dimensions)", item.get('dimensions', '無法計算'))
+                    st.info(f"🤖 Gemini 智慧評估報告：\n{item.get('ai_report')}")
 
                     mesh_toggle_key = f"toggle_mesh_{asset_id}"
                     pc_toggle_key = f"toggle_pc_{asset_id}"
@@ -237,7 +246,7 @@ with tab1:
                                 st.components.v1.html(html_canvas, height=330)
 
                         if st.session_state.get(pc_toggle_key, False):
-                            if is_usdz: st.warning("🌌 點雲模擬目前專屬於工業 GLB 格式！")
+                            if is_usdz: st.warning("🌌 點雲模擬目前專專屬工業 GLB 格式！")
                             else:
                                 with st.spinner("🌌 正在從儲存桶逆向還原高科技點雲..."):
                                     try:
