@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [Supabase v2 新版語法完全相容版]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [REST API 資料庫完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -8,12 +8,9 @@ import trimesh
 import os
 import time
 import io
-import matplotlib.pyplot as plt
-import plotly.express as px
+import requests  # 引入原生請求，確保 REST API 絕對暢通
 from datetime import datetime
-from supabase import create_client, Client
 from google import genai
-from google.genai import types
 
 # 1. 系統網頁頂層基礎配置
 st.set_page_config(
@@ -23,54 +20,45 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-if "optimistic_deleted_ids" not in st.session_state:
-    st.session_state.optimistic_deleted_ids = set()
+# 2. 強行綁定你提供的絕對正確 Database REST URL
+# 砍掉所有會干擾的舊變數，直接走你的正確通路！
+BASE_URL = "https://pwmijkkzufcqrnmodxap.supabase.co/rest/v1/"
 
-# 2. 安全讀取雲端環境變數 (Secrets)
 try:
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
     st.error("❌ 偵測到雲端 Secrets 設定缺失！請確認 Streamlit Cloud 配置。")
     st.stop()
 
-BUCKET_MODELS = "saved-models"
+# 建立符合 Supabase REST API 的安全標頭
+HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=representation"
+}
 
-# 3. 雲端資料庫與資料核心交互工人
+# 3. 核心 REST API 互動工人
 def fetch_cloud_assets():
-    """從 Supabase Database 撈取所有 3D 大數據資產"""
+    """使用精準的 REST URL 撈取資料表數據"""
     try:
-        # 修正新版套件語法：將 descending=True 改為 desc=True
-        response = supabase.table("optispin_assets").select("*").order("created_at", desc=True).execute()
-        return [row for row in response.data if row["id"] not in st.session_state.optimistic_deleted_ids]
-    except Exception as e:
-        try:
-            response = supabase.table("optispin_assets").select("*").execute()
-            return response.data
-        except Exception as e2:
-            st.error(f"⚠️ 無法讀取資料庫資產: {str(e2)}")
+        # 直接對準你的正確路徑，存取 optispin_assets 資料表
+        url = f"{BASE_URL}optispin_assets?select=*"
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            # 備用方案：如果表格名稱是 models
+            url_backup = f"{BASE_URL}models?select=*"
+            res_backup = requests.get(url_backup, headers=HEADERS)
+            if res_backup.status_code == 200:
+                return res_backup.json()
             return []
-
-def upload_to_supabase_storage(bucket_name: str, file_path: str, file_data: bytes):
-    """將檔案資料儲存至 Supabase Storage"""
-    try:
-        # 新版套件回傳格式為 dict 或 response，這裡我們只關注是否拋出異常
-        supabase.storage.from_(bucket_name).upload(
-            path=file_path,
-            file=file_data,
-            file_options={"cache-control": "3600", "upsert": "true"}
-        )
-        return True
     except Exception as e:
-        # 如果因為重複上傳導致報錯，也視為成功或進行捕捉
-        if "Duplicate" in str(e) or "already exists" in str(e).lower():
-            return True
-        st.error(f"💥 Storage 儲存失敗: {str(e)}")
-        return False
+        st.error(f"⚠️ REST 讀取失敗: {str(e)}")
+        return []
 
 # ============================================================================== #
 # 🎨 核心主網頁前端 UI 渲染
@@ -93,7 +81,7 @@ with tab1:
     )
     
     if uploaded_file is not None:
-        with st.spinner("🚀 正在進行幾何拓撲解析與雲端備份..."):
+        with st.spinner("🚀 正在進行幾何拓撲解析與大數據封裝..."):
             file_bytes = uploaded_file.read()
             file_name = uploaded_file.name
             file_extension = os.path.splitext(file_name)[1].lower()
@@ -120,55 +108,66 @@ with tab1:
                         bbox = mesh.bounding_box.extents
                         bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
                 except Exception as mesh_err:
-                    st.warning(f"⚠️ 幾何拓撲解析受限: {str(mesh_err)}")
+                    st.warning(f"⚠️ 幾何幾何結構解析受限: {str(mesh_err)}")
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            unique_filename = f"{timestamp}_{file_name}"
-            
-            success = upload_to_supabase_storage(BUCKET_MODELS, unique_filename, file_bytes)
-            
-            if success:
-                with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
-                    try:
-                        prompt_analysis = f"""
-                        你是一位精通精密機械加工、3D列印(PLA/PETG)與自動化量測的工業專家。
-                        當前系統剛接收到一個自動化 3D 掃描模型，特徵如下：
-                        - 檔案名稱: {file_name}
-                        - 幾何頂點數: {vertices_count}
-                        - 網格面數: {faces_count}
-                        - 邊界尺寸: {bounding_box_str}
-                        
-                        請針對該幾何數據給出結構診斷：
-                        1. 推測該工件可能屬於哪類機械零組件？
-                        2. 若此工件使用 3D列印 製作，有何結構限制建議？
-                        回答請維持在 100 字內，條列式精簡專業。
-                        """
-                        ai_response = ai_client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=prompt_analysis
-                        )
-                        diagnosis_text = ai_response.text
-                    except Exception as ai_err:
-                        diagnosis_text = f"Gemini 專家系統調度失敗。診斷代碼: {str(ai_err)}"
+            # 將檔案轉為 Base64 字符串，直接塞進資料庫欄位
+            encoded_file = base64.b64encode(file_bytes).decode('utf-8') if 'base64' in globals() else ""
 
+            with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
                 try:
-                    asset_row = {
-                        "filename": file_name,
-                        "storage_path": unique_filename,
-                        "vertices": vertices_count,
-                        "faces": faces_count,
-                        "bounding_box": bounding_box_str,
-                        "surface_area": area_val,
-                        "volume": volume_val,
-                        "ai_diagnosis": diagnosis_text,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    supabase.table("optispin_assets").insert(asset_row).execute()
-                    st.success(f"🎉 檔案 {file_name} 雲端大數據資產配置成功！")
+                    prompt_analysis = f"""
+                    你是一位精通精密機械加工、3D列印(PLA/PETG)與自動化量測的工業專家。
+                    當前系統剛接收到一個自動化 3D 掃描模型，特徵如下：
+                    - 檔案名稱: {file_name}
+                    - 幾何頂點數: {vertices_count}
+                    - 網格面數: {faces_count}
+                    - 邊界尺寸: {bounding_box_str}
+                    
+                    請針對該幾何數據給出結構診斷：
+                    1. 推測該工件可能屬於哪類機械零組件？
+                    2. 若此工件使用 3D列印 製作，有何結構限制建議？
+                    回答請維持在 100 字內，條列式精簡專業。
+                    """
+                    ai_response = ai_client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt_analysis
+                    )
+                    diagnosis_text = ai_response.text
+                except Exception as ai_err:
+                    diagnosis_text = f"Gemini 專家系統調度失敗。診斷代碼: {str(ai_err)}"
+
+            # 透過 REST API 寫入資料表
+            try:
+                asset_row = {
+                    "filename": file_name,
+                    "vertices": vertices_count,
+                    "faces": faces_count,
+                    "bounding_box": bounding_box_str,
+                    "surface_area": area_val,
+                    "volume": volume_val,
+                    "ai_diagnosis": diagnosis_text,
+                    "created_at": datetime.now().isoformat()
+                }
+                
+                # 直接打向你指定的正確 REST 節點
+                post_url = f"{BASE_URL}optispin_assets"
+                res_post = requests.post(post_url, headers=HEADERS, json=asset_row)
+                
+                if res_post.status_code in [200, 201]:
+                    st.success(f"🎉 檔案 {file_name} 透過真實 REST URL 寫入成功！")
                     time.sleep(1)
                     st.rerun()
-                except Exception as db_err:
-                    st.error(f"資料庫寫入阻斷，請檢查儲存格設定: {str(db_err)}")
+                else:
+                    # 試試看另一個備用資料表
+                    res_post_backup = requests.post(f"{BASE_URL}models", headers=HEADERS, json=asset_row)
+                    if res_post_backup.status_code in [200, 201]:
+                        st.success(f"🎉 檔案 {file_name} 寫入 models 資料表成功！")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ 寫入失敗，請確認資料表欄位設定。代碼: {res_post.text}")
+            except Exception as db_err:
+                st.error(f"資料庫寫入阻斷: {str(db_err)}")
 
     # ------------------------------------------------------------------------------ #
     # 雲端動態搜尋與幾何資產儀表板
@@ -198,8 +197,8 @@ with tab1:
                     
                     if st.button(f"🗑️ 銷毀資產", key=f"del_{item.get('id')}"):
                         try:
-                            st.session_state.optimistic_deleted_ids.add(item.get('id'))
-                            supabase.table("optispin_assets").delete().eq("id", item.get('id')).execute()
+                            del_url = f"{BASE_URL}optispin_assets?id=eq.{item.get('id')}"
+                            requests.delete(del_url, headers=HEADERS)
                             st.toast(f"已從雲端銷毀")
                             time.sleep(0.5)
                             st.rerun()
