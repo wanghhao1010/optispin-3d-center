@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [大數據降載防超時收官完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [實體網格/點雲雙軌彈窗節流完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -10,9 +10,9 @@ import time
 import io
 import requests  
 import base64
-import plotly.graph_objects as go
 from datetime import datetime
 from google import genai
+import plotly.graph_objects as go
 
 # 1. 系統網頁頂層基礎配置
 st.set_page_config(
@@ -40,10 +40,10 @@ HEADERS = {
     "Prefer": "return=representation"
 }
 
-def fetch_cloud_assets():
-    """🚀 核心降載防禦：明定要撈取的欄位，強行排除 filesize 巨大文字，確保 0.2 秒極速加載"""
+def fetch_lightweight_assets():
+    """🚀 核心降載防禦：明定要撈取的純文字欄位，強行排除 filesize 巨大文字"""
     try:
-        # 🛠️ 僅篩選必要幾何輕量欄位，避開 filesize 快取大魔王，徹底終結 Timeout
+        # 🛠️ 排除 filesize 大魔王，確保 1 秒極速秒開
         fields = "id,filename,timestamp,vertices,faces,bounding_box,surface_area,volume,ai_diagnosis"
         url_new = f"{BASE_URL}optispin_assets?select={fields}&order=id.desc"
         response = requests.get(url_new, headers=HEADERS, timeout=8)
@@ -67,6 +67,20 @@ def fetch_cloud_assets():
     except Exception as e:
         return []
 
+def fetch_single_filesize_base64(asset_id):
+    """🛠️ 按需撈取核心：只有當用戶點擊時，才單獨、非同步地去撈取該比檔案的巨大 Base64 字串"""
+    try:
+        # 僅捞取 filesize 欄位
+        url_single = f"{BASE_URL}optispin_assets?select=filesize,filename&id=eq.{asset_id}"
+        response = requests.get(url_single, headers=HEADERS, timeout=20)
+        if response.status_code == 200 and len(response.json()) > 0:
+            data = response.json()[0]
+            return data.get("filesize", ""), data.get("filename", "")
+        return "", ""
+    except Exception as e:
+        st.error(f"❌ 大數據撈取超時: {str(e)}")
+        return "", ""
+
 # ============================================================================== #
 # 🎨 核心主網頁前端 UI 渲染
 # ============================================================================== #
@@ -76,8 +90,8 @@ st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生與自�
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
-# 瞬間撈取全量降載數據，絕不拖泥帶水
-cloud_data = fetch_cloud_assets()
+# 極速撈取輕量資產數據，絕不拖泥帶水
+cloud_data = fetch_lightweight_assets()
 
 # ------------------------------------------------------------------------------ #
 # 分頁一：3D 大數據資產管理端
@@ -104,21 +118,20 @@ with tab1:
                     faces_count = 0
                     bounding_box_str = "150.0 x 150.0 x 150.0 mm (動態尺寸)"
                     area_val, volume_val = 0.0, 0.0
-                    current_mesh = None
                     
                     if file_extension in [".obj", ".stl", ".glb"]:
                         try:
                             file_stream = io.BytesIO(file_bytes)
                             scene_or_mesh = trimesh.load(file_stream, file_type=file_extension.strip('.'))
-                            current_mesh = list(scene_or_mesh.geometry.values())[0] if isinstance(scene_or_mesh, trimesh.Scene) else scene_or_mesh
+                            mesh = list(scene_or_mesh.geometry.values())[0] if isinstance(scene_or_mesh, trimesh.Scene) else scene_or_mesh
                             
-                            if current_mesh is not None:
-                                vertices_count = len(current_mesh.vertices)
-                                faces_count = len(current_mesh.faces)
-                                area_val = float(current_mesh.area) * 1000000.0
-                                volume_val = float(current_mesh.volume) * 1000000000.0 if current_mesh.is_volume else 0.0
+                            if mesh is not None:
+                                vertices_count = len(mesh.vertices)
+                                faces_count = len(mesh.faces)
+                                area_val = float(mesh.area) * 1000000.0
+                                volume_val = float(mesh.volume) * 1000000000.0 if mesh.is_volume else 0.0
                                 
-                                bbox = current_mesh.bounding_box.extents * 1000.0
+                                bbox = mesh.bounding_box.extents * 1000.0
                                 bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
                         except Exception:
                             pass
@@ -134,14 +147,17 @@ with tab1:
                 with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
                     try:
                         prompt_analysis = f"""
-                        你是一位精通精密機械加工、3D列印與逆向工程的工業專家。
+                        你是一位精通精密機械加工、3D列印(PLA/PETG)與逆向工程的工業專家。
                         當前系統剛接收到一個自動化 3D 掃描模型：
                         - 檔案名稱: {file_name}
                         - 幾何網格面數: {faces_count}
                         - 實際工件尺寸: {bounding_box_str}
-                        回答限制在 100 字內，條列式精簡專業。
+                        
+                        請針對該尺寸與形狀給出結構診斷並給予 FDM PLA/PETG 列印限制建議。回答限制在 100 字內，條列式精簡專業。
                         """
-                        ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
+                        ai_response = ai_client.models.generate_content(
+                            model='gemini-2.5-flash', contents=prompt_analysis
+                        )
                         diagnosis_text = ai_response.text
                     except Exception:
                         diagnosis_text = "工件已成功收錄。當前雲端分析超時，已自動排入大數據分析日誌中。"
@@ -162,8 +178,6 @@ with tab1:
                         
                         res_post = requests.post(f"{BASE_URL}optispin_assets", headers=HEADERS, json=asset_row, timeout=15)
                         if res_post.status_code in [200, 201, 204]:
-                            # 🛠️ 上傳當下，將當前上傳的模型暫存於快取記憶體中，用於當下即時渲染點雲
-                            st.session_state["last_uploaded_mesh"] = current_mesh
                             st.session_state[upload_key] = True
                             st.success(f"🎉 {file_name} 已安全存入雲端數據中心！")
                             time.sleep(0.5)
@@ -173,21 +187,8 @@ with tab1:
                     except Exception as db_err:
                         st.error(f"❌ 資料庫通訊連線斷開: {str(db_err)}")
 
-        # 🛸 本地上傳工件即時單色點雲模擬視窗
-        if "last_uploaded_mesh" in st.session_state and st.session_state["last_uploaded_mesh"] is not None:
-            st.success("🛰️ 當前剛上傳工件之點雲模擬圖表：")
-            try:
-                mesh_obj = st.session_state["last_uploaded_mesh"]
-                max_points = 1200
-                points = mesh_obj.vertices[np.random.choice(len(mesh_obj.vertices), max_points, replace=False)] if len(mesh_obj.vertices) > max_points else mesh_obj.vertices
-                fig = go.Figure(data=[go.Scatter3d(x=points[:, 0]*1000, y=points[:, 1]*1000, z=points[:, 2]*1000, mode='markers', marker=dict(size=2.5, color='#00f0ff', opacity=0.85))])
-                fig.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), bgcolor="black"), margin=dict(r=0,l=0,b=0,t=0), paper_bgcolor="black", height=280)
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-            except Exception:
-                pass
-
     # ------------------------------------------------------------------------------ #
-    # 雲端資產動態輕量搜尋儀表板 (極速、絕不超時、安全過濾)
+    # 雲端資產動態搜尋儀表板 (🛠️ 核心：點擊獨立按鈕才動態非同步撈取 3D 畫布)
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
@@ -206,6 +207,7 @@ with tab1:
                 with st.container():
                     display_time = str(item.get('timestamp', ''))[:16].replace('T', ' ')
                     fname = item.get('filename')
+                    asset_id = item.get('id')
                     
                     st.markdown(f"#### 📄 檔案: {fname}")
                     st.caption(f"🕒 上傳時間: {display_time}")
@@ -217,12 +219,63 @@ with tab1:
                         st.metric("工業邊界包絡體 (Bounding Box)", item.get('bounding_box', '無法計算'))
                     
                     st.info(f"**🤖 Gemini 智慧製程評估報告：**\n{item.get('ai_diagnosis')}")
-                    
-                    if st.button(f"🗑️ 銷毀資產", key=f"del_{item.get('id')}_{fname}"):
-                        requests.delete(f"{BASE_URL}optispin_assets?id=eq.{item.get('id')}", headers=HEADERS)
-                        st.toast("已從雲端銷毀")
-                        time.sleep(0.5)
-                        st.rerun()
+
+                    # 🛠️ 核心除錯機制：動態生成按鈕對話框，隔離大數據渲染器
+                    view_col1, view_col2, del_col = st.columns([1.2, 1.2, 1])
+                    with view_col1:
+                        if st.button(f"🛰️ 查看彩色實體", key=f"view_mesh_{asset_id}_{fname}"):
+                            # 1. 點擊才非同步去 Supabase 單獨撈這筆資料的 Base64 文字
+                            with st.spinner("🛸 正在非同步封裝全貼圖幾何數據..."):
+                                mesh_b64, mesh_fname = fetch_single_filesize_base64(asset_id)
+                                
+                            # 2. 只有撈到資料才在 Session State 裡儲存要彈出的彩色模型編碼
+                            if mesh_b64 and len(mesh_b64) > 100:
+                                is_usdz = str(mesh_fname).lower().endswith('.usdz')
+                                st.session_state["modal_content"] = {
+                                    "type": "mesh",
+                                    "b64": mesh_b64,
+                                    "is_usdz": is_usdz,
+                                    "fname": mesh_fname
+                                }
+                            else:
+                                st.warning("⚠️ 此為早期除錯快取檔案，未包含完整彩色實體快取軌道。")
+                                
+                    with view_col2:
+                        if st.button(f"🌌 查看單色點雲", key=f"view_pc_{asset_id}_{fname}"):
+                            with st.spinner("🌌 正在非同步封裝高精度幾何點雲模擬..."):
+                                mesh_b64, mesh_fname = fetch_single_filesize_base64(asset_id)
+                                
+                            if mesh_b64 and len(mesh_b64) > 100 and not str(mesh_fname).lower().endswith('.usdz'):
+                                # 解碼並轉換點雲，存入對話框快取
+                                with st.spinner("逆向拓撲解析中..."):
+                                    try:
+                                        file_stream_rec = io.BytesIO(base64.b64decode(mesh_b64))
+                                        scene_or_mesh_rec = trimesh.load(file_stream_rec, file_type='glb')
+                                        current_mesh_rec = list(scene_or_mesh_rec.geometry.values())[0] if isinstance(scene_or_mesh_rec, trimesh.Scene) else scene_or_mesh_rec
+                                        
+                                        # 為了效能，抽取 1500 點進行點雲模擬
+                                        max_points = 1500
+                                        indices = np.random.choice(len(current_mesh_rec.vertices), min(len(current_mesh_rec.vertices), max_points), replace=False)
+                                        sampled_points = current_mesh_rec.vertices[indices] * 1000.0
+                                        
+                                        st.session_state["modal_content"] = {
+                                            "type": "point_cloud",
+                                            "b64": sampled_points, # 存座標數組
+                                            "fname": mesh_fname
+                                        }
+                                    except Exception:
+                                        st.warning("🔺 點雲生成受限")
+                            elif str(mesh_fname).lower().endswith('.usdz'):
+                                st.warning("🌌 USDZ 為 iOS 專屬格式，直接點擊「查看彩色實體」進行 AR 投放即可！")
+                            else:
+                                st.warning("⚠️ 此為早期除錯快取檔案。")
+
+                    with del_col:
+                        if st.button(f"🗑️ 銷毀", key=f"del_{asset_id}_{fname}", type="secondary"):
+                            requests.delete(f"{BASE_URL}optispin_assets?id=eq.{asset_id}", headers=HEADERS)
+                            st.toast("已從雲端銷毀")
+                            time.sleep(0.5)
+                            st.rerun()
                     st.markdown("<hr style='margin: 10px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
         else:
             st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
@@ -252,3 +305,59 @@ with tab2:
         
         if "cached_diagnostic_report" in st.session_state:
             st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px; border-left: 5px solid #00f0ff;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
+
+
+# ============================================================================== #
+# 🛸 核心偵錯除錯面板：動態彈窗渲染器 (這部分放在主網頁最後，用於呈現對話框)
+# ============================================================================== #
+if "modal_content" in st.session_state and st.session_state["modal_content"] is not None:
+    modal_data = st.session_state["modal_content"]
+    st.markdown("---")
+    st.subheader(f"📡 當前撈取大數據實體：{modal_data.get('fname')}")
+    
+    # 用一個黑底 container 包住對話框，復刻高科技感
+    with st.container(border=True):
+        if modal_data["type"] == "mesh":
+            # 渲染彩色模型（修復 USDZ AR 屬性）
+            mesh_b64 = modal_data["b64"]
+            is_usdz = modal_data["is_usdz"]
+            
+            src_tag = f'src="data:model/vnd.usdz+zip;base64,{mesh_b64}" ios-src="data:model/vnd.usdz+zip;base64,{mesh_b64}"' if is_usdz else f'src="data:model/gltf-binary;base64,{mesh_b64}"'
+            
+            html_canvas = f"""
+            <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+            <model-viewer 
+                {src_tag}
+                alt="OptiSpin 彩色實體" 
+                ar ar-modes="quick-look webxr" camera-controls auto-rotate
+                style="width: 100%; height: 350px; background-color: #1a1a1a; border-radius: 10px;">
+                <button slot="ar-button" style="background-color: #00f0ff; color: black; border: none; border-radius: 5px; padding: 10px; position: absolute; bottom: 15px; right: 15px; font-weight: bold;">
+                    📱 啟動手機 AR 投放
+                </button>
+            </model-viewer>
+            """
+            st.components.v1.html(html_canvas, height=360)
+            
+        elif modal_data["type"] == "point_cloud":
+            # 渲染高科技黑底白色點雲模擬圖！復刻你最愛的模式
+            points = modal_data["b64"]
+            with st.spinner("🌌 復刻單色粒子模式中..."):
+                fig = go.Figure(data=[go.Scatter3d(
+                    x=points[:, 0], y=points[:, 1], z=points[:, 2],
+                    mode='markers',
+                    marker=dict(size=2.8, color='white', opacity=0.88)
+                )])
+                fig.update_layout(
+                    scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), bgcolor="black"),
+                    margin=dict(r=0, l=0, b=0, t=0),
+                    paper_bgcolor="black",
+                    height=360
+                )
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                
+        col_close = st.columns([4, 1])
+        with col_close[1]:
+            # 按下關閉，直接清空 Session State，記憶體立刻釋放，畫布消失
+            if st.button("❌ 關閉畫布", type="secondary"):
+                st.session_state["modal_content"] = None
+                st.rerun()
