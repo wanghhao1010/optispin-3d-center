@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [44筆資料全量解鎖通車完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [精準欄位嚙合・大圓滿完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -35,7 +35,6 @@ except Exception as e:
     st.error("❌ 偵測到雲端 Secrets 設定缺失！請確認 Streamlit Cloud 配置。")
     st.stop()
 
-# 🎯 【核心修正】：移除 Prefer=representation，避免 RLS 政策阻斷回傳導致程式誤判中斷
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -43,11 +42,11 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 全量釋放流道：徹底打破過濾限制，確保資料庫裡的 44 筆資料 100% 完美現形"""
+    """🚀 全量解鎖流道：完美對齊 ai_diagnosis 欄位，粉碎 0 筆 Bug"""
     try:
         cache_buster = int(time.time())
-        # 抓取目前資料庫現存的核心欄位
-        fields = "id,filename,timestamp,filesize,dimensions,ai_report"
+        # 🎯 【精準對齊】：select 裡面必須是資料庫現存的 ai_diagnosis 欄位
+        fields = "id,filename,timestamp,filesize,dimensions,ai_diagnosis"
         url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc&cb={cache_buster}"
         
         response = requests.get(url_new, headers=HEADERS, timeout=8)
@@ -56,7 +55,6 @@ def fetch_lightweight_assets():
             raw_list = response.json()
             clean_list = []
             for row in raw_list:
-                # 🪐 容錯全面放行：就算 filesize 或 dimensions 是 NULL，也絕對不丟棄資料
                 fsize_val = row.get("filesize")
                 safe_row = {
                     "id": row.get("id", 0),
@@ -64,8 +62,9 @@ def fetch_lightweight_assets():
                     "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "vertices": 45000,  
                     "faces": 90000,
-                    "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm (掃描體積)",
-                    "ai_report": row.get("ai_report") if row.get("ai_report") else "工件已成功收錄至 OptiSpin 雲端大數據中心。",
+                    "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
+                    # 🎯 從正確的 ai_diagnosis 欄位撈取數據並映射到前台
+                    "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。",
                     "filesize": str(fsize_val) if fsize_val else ""
                 }
                 clean_list.append(safe_row)
@@ -163,21 +162,20 @@ with tab1:
                 except Exception: 
                     diagnosis_text = "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。"
 
-                # 4. 對齊寫入資料表
+                # 4. 對齊寫入資料表真正的欄位名稱
                 asset_row = {
                     "filename": file_name, 
                     "vertices": int(vertices_count), 
                     "faces": int(faces_count),
                     "dimensions": bounding_box_str,  
-                    "ai_report": diagnosis_text,    
-                    "filesize": model_url if model_url else None, # 如果儲存桶沒拿到也允許為 None 寫入         
+                    "ai_diagnosis": diagnosis_text,    # 🎯 寫入端也同步使用正統的 ai_diagnosis 
+                    "filesize": model_url if model_url else None,          
                     "file_path": file_name,
                     "timestamp": datetime.now().isoformat() 
                 }
                 
                 res_db = requests.post(f"{BASE_URL}{TABLE_NAME}", headers=HEADERS, json=asset_row, timeout=15)
                 
-                # 🎯 【解鎖關鍵】：只要資料庫收件成功（200 或 201），直接放行，不再卡死在 return=representation
                 if res_db.status_code in [200, 201, 204]:
                     st.session_state["upload_triggered"] = False
                     st.success(f"🎉 {file_name} 已成功格式化並存入雲端中心！")
@@ -226,7 +224,7 @@ with tab1:
 
                     view_col1, del_col = st.columns([2, 1])
                     with view_col1:
-                        if file_url:
+                        if file_url and file_url.startswith("http"):
                             if st.button(f"🛰️ 實體空間 3D / AR 預覽投放", key=f"btn_m_{asset_id}", use_container_width=True):
                                 st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
                                 st.rerun()
