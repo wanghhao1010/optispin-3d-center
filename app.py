@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [正統工業級 Storage 儲存架構・終極完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [最高權限工業 Storage + 實體防呆鈕完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -58,7 +58,7 @@ def fetch_lightweight_assets():
             clean_list = []
             for row in raw_list:
                 file_url = row.get("filesize", "")
-                # 🛡️ 乾淨安全過濾：只放行走全新 Storage 通道（http開頭）的新資料
+                # 🛡️ 乾淨安全過濾：只放行全新 Storage 通道（http開頭）的新資料
                 if str(file_url).startswith("http"):
                     safe_row = {
                         "id": row.get("id", 0),
@@ -118,8 +118,12 @@ with tab1:
     )
     
     if uploaded_file is not None:
-        upload_key = f"processed_{uploaded_file.name}_{uploaded_file.size}"
-        if upload_key not in st.session_state:
+        st.info(f"📦 檔案已就緒：{uploaded_file.name} ({uploaded_file.size/1024/1024:.2f} MB)")
+        
+        # 🛠️ 實體防呆同步按鈕：強制打破手機瀏覽器輸入法與網路訊號的凍結鎖
+        if st.button("🚀 點擊確認：啟動雲端大數據同步", type="primary", use_container_width=True, key="force_upload_trigger_btn"):
+            upload_key = f"processed_{uploaded_file.name}_{uploaded_file.size}"
+            
             with st.spinner("🚀 正在進行幾何拓撲解析與工業尺寸校正..."):
                 try:
                     file_bytes = uploaded_file.read()
@@ -153,7 +157,7 @@ with tab1:
             with st.spinner("📦 正在將 3D 圖檔高速分流至雲端儲存桶 (Storage)..."):
                 model_url = upload_to_supabase_storage(file_name, file_bytes)
                 if not model_url:
-                    st.error("❌ 儲存桶寫入失敗！請確認 Supabase 中已建立名為 models 的 Public Storage Bucket。")
+                    st.error("❌ 儲存桶寫入失敗！請確認 Supabase 中已建立 models 儲存桶並開通 Policy。")
                     st.stop()
 
             with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
@@ -171,7 +175,6 @@ with tab1:
                     "ai_diagnosis": diagnosis_text, "filesize": model_url, "timestamp": datetime.now().isoformat() 
                 }
                 requests.post(f"{BASE_URL}optispin_assets", headers=HEADERS, json=asset_row, timeout=15)
-                st.session_state[upload_key] = True
                 st.success(f"🎉 {file_name} 已成功格式化並存入雲端中心！")
                 time.sleep(0.5)
                 st.rerun()  
@@ -199,7 +202,7 @@ with tab1:
                     st.markdown(f"#### 📄 檔案: {fname}")
                     st.caption(f"🕒 上傳時間: {str(item.get('timestamp', ''))[:16].replace('T', ' ')}")
                     
-                    # 🛠️ 所見即所得「內嵌畫布容器槽」，完美卡在按鈕的正上方！
+                    # 🛠 *所見即所得「內嵌畫布容器槽」，完美卡在數據與按鈕的正中間！*
                     canvas_slot = st.container()
                     
                     col1, col2 = st.columns(2)
