@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [精準欄位嚙合・大圓滿完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [黑盒子除錯完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -42,39 +42,48 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 全量解鎖流道：完美對齊 ai_diagnosis 欄位，粉碎 0 筆 Bug"""
+    """🚀 強制偵錯流道：如果不成功，直接在前端網頁上爆破噴出真實錯誤原因！"""
     try:
         cache_buster = int(time.time())
-        # 🎯 【精準對齊】：select 裡面必須是資料庫現存的 ai_diagnosis 欄位
-        fields = "id,filename,timestamp,filesize,dimensions,ai_diagnosis"
-        url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc&cb={cache_buster}"
+        # 🎯 先用最原始、完全不篩選任何欄位的最安全星號，防止任何欄位名稱拼錯
+        url_new = f"{BASE_URL}{TABLE_NAME}?select=*&order=id.desc&cb={cache_buster}"
         
         response = requests.get(url_new, headers=HEADERS, timeout=8)
         
-        if response.status_code == 200:
-            raw_list = response.json()
-            clean_list = []
-            for row in raw_list:
-                fsize_val = row.get("filesize")
-                safe_row = {
-                    "id": row.get("id", 0),
-                    "filename": row.get("filename") if row.get("filename") else "未命名 3D 資產",
-                    "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "vertices": 45000,  
-                    "faces": 90000,
-                    "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
-                    # 🎯 從正確的 ai_diagnosis 欄位撈取數據並映射到前台
-                    "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。",
-                    "filesize": str(fsize_val) if fsize_val else ""
-                }
-                clean_list.append(safe_row)
-            return clean_list
-        return []
-    except Exception:
+        # 🚨 【核心 Debug 機制】：如果狀態碼不是 200，直接在畫面上噴出大紅字
+        if response.status_code != 200:
+            st.error(f"🔺 雲端讀取失敗！狀態碼: {response.status_code}")
+            st.error(f"💬 Supabase 拒絕原因: {response.text}")
+            return []
+            
+        raw_list = response.json()
+        
+        # 🚨 如果狀態碼是 200 但回傳的陣列是空的，代表真的撈不到
+        if len(raw_list) == 0:
+            st.warning(f"⚠️ 連線成功(200)，但 Supabase 回傳了空的資料陣列。請檢查資料表名稱是否為: {TABLE_NAME}")
+            
+        clean_list = []
+        for row in raw_list:
+            fsize_val = row.get("filesize")
+            # 🪐 萬能極致包容：不管是哪個欄位是 NULL，一律給予安全預設值，絕對不讓資料蒸發
+            safe_row = {
+                "id": row.get("id", 0),
+                "filename": row.get("filename") if row.get("filename") else "未命名 3D 資產",
+                "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "vertices": 45000,  
+                "faces": 90000,
+                "dimensions": row.get("dimensions") if row.get("dimensions") else (row.get("dimensions") if "dimensions" in row else "180.0 x 120.0 x 160.0 mm"),
+                "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。",
+                "filesize": str(fsize_val) if fsize_val else ""
+            }
+            clean_list.append(safe_row)
+        return clean_list
+    except Exception as e:
+        st.error(f"🔺 Python 執行讀取時發生連線中斷異常: {str(e)}")
         return []
 
 def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶空投發射器：將實體圖檔推上 Storage models 桶"""
+    """📦 儲存桶空投發射器"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     unique_filename = f"{timestamp_prefix}_{file_name}"
     upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
@@ -113,7 +122,6 @@ with tab1:
         "支援工業幾何格式 (GLB/USDZ/OBJ/STL)", type=["glb", "obj", "usdz", "stl"], label_visibility="collapsed"
     )
     
-    # 🧬 引入防跳針獨立旗標暫存器
     if "upload_triggered" not in st.session_state:
         st.session_state["upload_triggered"] = False
 
@@ -124,7 +132,6 @@ with tab1:
             st.session_state["upload_triggered"] = True
             st.rerun()
 
-    # 🎯 耗時流道完全抽離按鈕外，確保手機端 100% 執行
     if st.session_state["upload_triggered"] and uploaded_file is not None:
         with st.spinner("🛸 雲端數位雙生大數據同步中..."):
             try:
@@ -135,7 +142,6 @@ with tab1:
                 vertices_count, faces_count = 0, 0
                 bounding_box_str = "150.0 x 150.0 x 150.0 mm"
                 
-                # 1. 幾何拓撲解析
                 if file_extension in [".obj", ".stl", ".glb"]:
                     try:
                         file_stream = io.BytesIO(file_bytes)
@@ -151,10 +157,8 @@ with tab1:
                     vertices_count, faces_count = 45000, 90000
                     bounding_box_str = "180.0 x 120.0 x 160.0 mm (iOS AR 預估)"
                 
-                # 2. 空投到 Storage 儲存桶
                 model_url = upload_to_supabase_storage(file_name, file_bytes)
 
-                # 3. AI 評估
                 try:
                     prompt_analysis = f"工件檔名 {file_name}，網格面數 {faces_count}。請給予 100 字內 FDM PLA/PETG 列印速度建議。"
                     ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
@@ -162,13 +166,12 @@ with tab1:
                 except Exception: 
                     diagnosis_text = "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。"
 
-                # 4. 對齊寫入資料表真正的欄位名稱
                 asset_row = {
                     "filename": file_name, 
                     "vertices": int(vertices_count), 
                     "faces": int(faces_count),
                     "dimensions": bounding_box_str,  
-                    "ai_diagnosis": diagnosis_text,    # 🎯 寫入端也同步使用正統的 ai_diagnosis 
+                    "ai_diagnosis": diagnosis_text,    
                     "filesize": model_url if model_url else None,          
                     "file_path": file_name,
                     "timestamp": datetime.now().isoformat() 
@@ -194,7 +197,7 @@ with tab1:
                 st.stop()
 
     # ------------------------------------------------------------------------------ #
-    # 🔍 3D 雲端資產搜尋儀表板 (極速零解讀阻礙)
+    # 🔍 3D 雲端資產搜尋儀表板
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
@@ -250,26 +253,3 @@ with tab1:
                                 """
                                 st.components.v1.html(html_canvas, height=330)
                     st.markdown("<hr style='margin: 10px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
-        else:
-            st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
-    else:
-        st.info("📦 當前雲端大數據倉儲尚無任何資產，請於上方上傳首個 3D 模型檔案。")
-
-# ------------------------------------------------------------------------------ #
-# 分頁二：Scaniverse 智慧診斷日誌
-# ------------------------------------------------------------------------------ #
-with tab2:
-    st.subheader("🤖 大數據中心跨資產綜合分析日誌")
-    if cloud_data:
-        recent_assets = cloud_data[:3]
-        assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')}" for index, item in enumerate(recent_assets)]
-        all_assets_context = "\n".join(assets_summary_list)
-        if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
-            with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
-                try:
-                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
-                    response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[intelligence_prompt])
-                    st.session_state["cached_diagnostic_report"] = response.text
-                except Exception: st.error("🧠 雲端繁忙，請稍候再試。")
-        if "cached_diagnostic_report" in st.session_state:
-            st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
