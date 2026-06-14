@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [REST API 完整完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [完整相容與時間顯示版]
 # ============================================================================== #
 
 import streamlit as st
@@ -8,7 +8,7 @@ import trimesh
 import os
 import time
 import io
-import requests  # 確保 REST API 絕對暢通
+import requests  
 import base64
 from datetime import datetime
 from google import genai
@@ -42,22 +42,34 @@ HEADERS = {
 
 # 3. 核心 REST API 互動工人
 def fetch_cloud_assets():
-    """使用精準的 REST URL 撈取資料表數據"""
+    """同時撈取新表格 optispin_assets 與舊表格 models 的資料，確保以前的雲點圖不丟失"""
+    all_assets = []
+    
+    # A. 撈取新表格資料
     try:
-        # 直接對準正確路徑，存取 optispin_assets 資料表，並依照時間降序排列
-        url = f"{BASE_URL}optispin_assets?select=*&order=created_at.desc"
-        response = requests.get(url, headers=HEADERS)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            # 備用方案
-            url_backup = f"{BASE_URL}optispin_assets?select=*"
-            res_backup = requests.get(url_backup, headers=HEADERS)
-            if res_backup.status_code == 200:
-                return res_backup.json()
-            return []
-    except Exception as e:
-        return []
+        url_new = f"{BASE_URL}optispin_assets?select=*&order=created_at.desc"
+        res_new = requests.get(url_new, headers=HEADERS)
+        if res_new.status_code == 200:
+            all_assets.extend(res_new.json())
+    except Exception:
+        pass
+
+    # B. 嘗試撈取舊表格資料（相容以前的雲點圖）
+    try:
+        url_old = f"{BASE_URL}models?select=*"
+        res_old = requests.get(url_old, headers=HEADERS)
+        if res_old.status_code == 200:
+            # 避免重複加入
+            existing_filenames = {item.get("filename") for item in all_assets if item.get("filename")}
+            for item in res_old.json():
+                if item.get("filename") not in existing_filenames:
+                    all_assets.append(item)
+    except Exception:
+        pass
+
+    # 依時間排序（如果沒有時間欄位則排最後）
+    all_assets.sort(key=lambda x: x.get("created_at", x.get("timestamp", "")), reverse=True)
+    return all_assets
 
 # ============================================================================== #
 # 🎨 核心主網頁前端 UI 渲染
@@ -80,7 +92,6 @@ with tab1:
     )
     
     if uploaded_file is not None:
-        # 使用一個唯一的 Key 來防止重複觸發上傳
         upload_key = f"processed_{uploaded_file.name}_{uploaded_file.size}"
         
         if upload_key not in st.session_state:
@@ -94,7 +105,6 @@ with tab1:
                 bounding_box_str = "無法計算"
                 area_val, volume_val = 0.0, 0.0
                 
-                # 執行 3D 幾何結構解析
                 if file_extension in [".obj", ".stl", ".glb"]:
                     try:
                         file_stream = io.BytesIO(file_bytes)
@@ -114,7 +124,6 @@ with tab1:
                     except Exception as mesh_err:
                         st.warning(f"⚠️ 幾何結構解析受限: {str(mesh_err)}")
 
-                # 調度 Gemini 進行工業診斷
                 with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
                     try:
                         prompt_analysis = f"""
@@ -138,7 +147,6 @@ with tab1:
                     except Exception as ai_err:
                         diagnosis_text = f"Gemini 專家系統調度失敗。{str(ai_err)}"
 
-                # 透過原生 REST API 打向你的 Supabase 資料表
                 try:
                     asset_row = {
                         "filename": file_name,
@@ -158,9 +166,9 @@ with tab1:
                         st.session_state[upload_key] = True
                         st.success(f"🎉 檔案 {file_name} 寫入成功！正在刷新儀表板...")
                         time.sleep(0.8)
-                        st.rerun()  # 🛠️ 強制重整網頁，終結轉圈圈狀態！
+                        st.rerun()  
                     else:
-                        st.error(f"❌ 寫入失敗，代碼: {res_post.status_code}, 內容: {res_post.text}")
+                        st.error(f"❌ 寫入失敗，代碼: {res_post.status_code}")
                 except Exception as db_err:
                     st.error(f"資料庫通訊阻斷: {str(db_err)}")
 
@@ -181,7 +189,20 @@ with tab1:
         if filtered_data:
             for item in filtered_data:
                 with st.container():
+                    # 🕒 解析並漂亮顯示時間（支援新舊表格的時間欄位格式）
+                    raw_time = item.get('created_at' if item.get('created_at') else 'timestamp', '')
+                    display_time = "未知時間"
+                    if raw_time:
+                        try:
+                            # 格式化 ISO 時間字串，只取到分鐘，讓畫面乾淨
+                            dt = datetime.fromisoformat(raw_time.replace('Z', '+00:00'))
+                            display_time = dt.strftime("%Y-%m-%d %H:%M")
+                        except Exception:
+                            display_time = str(raw_time)[:16] # 發生錯誤時直接截取前16碼
+                    
                     st.markdown(f"#### 📄 檔案: {item.get('filename', '未命名資產')}")
+                    st.caption(f"🕒 上傳時間: {display_time}") # 顯示時間標籤
+                    
                     col1, col2 = st.columns(2)
                     with col1:
                         st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
@@ -190,10 +211,15 @@ with tab1:
                     
                     st.info(f"**🤖 Gemini 智慧製程評估報告：**\n{item.get('ai_diagnosis', '無診斷數據')}")
                     
-                    if st.button(f"🗑️ 銷毀資產", key=f"del_{item.get('id')}"):
+                    if st.button(f"🗑️ 銷毀資產", key=f"del_{item.get('id')}_{item.get('filename')}"):
                         try:
-                            del_url = f"{BASE_URL}optispin_assets?id=eq.{item.get('id')}"
-                            requests.delete(del_url, headers=HEADERS)
+                            # 優先從新表格刪除，若找不到則從舊表格刪除
+                            del_url_new = f"{BASE_URL}optispin_assets?id=eq.{item.get('id')}"
+                            res_del = requests.delete(del_url_new, headers=HEADERS)
+                            
+                            del_url_old = f"{BASE_URL}models?id=eq.{item.get('id')}"
+                            requests.delete(del_url_old, headers=HEADERS)
+                            
                             st.toast(f"已從雲端銷毀")
                             time.sleep(0.5)
                             st.rerun()
