@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [黑盒子除錯完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [解鎖快取封鎖・全線大通車完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -35,6 +35,7 @@ except Exception as e:
     st.error("❌ 偵測到雲端 Secrets 設定缺失！請確認 Streamlit Cloud 配置。")
     st.stop()
 
+# 🎯 全域基礎標頭
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -42,44 +43,44 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 強制偵錯流道：如果不成功，直接在前端網頁上爆破噴出真實錯誤原因！"""
+    """🚀 終極放行流道：改用 HTTP Header 粉碎快取，網址回歸純淨，100% 破關！"""
     try:
-        cache_buster = int(time.time())
-        # 🎯 先用最原始、完全不篩選任何欄位的最安全星號，防止任何欄位名稱拼錯
-        url_new = f"{BASE_URL}{TABLE_NAME}?select=*&order=id.desc&cb={cache_buster}"
+        # 🎯 【乾淨純粹的網址】：徹底移除害我們爆炸的 &cb= 網址參數
+        url_new = f"{BASE_URL}{TABLE_NAME}?select=*&order=id.desc"
         
-        response = requests.get(url_new, headers=HEADERS, timeout=8)
+        # 🛠️ 【工業級防快取大絕招】：把快取禁止令改塞在 HTTP Headers 裡面！
+        # 這樣既能強迫主機每一微秒都去 Supabase 連線拿最新資料，又絕對不會觸發 PostgREST 400 語法錯誤！
+        live_headers = HEADERS.copy()
+        live_headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        live_headers["Pragma"] = "no-cache"
+        live_headers["Expires"] = "0"
         
-        # 🚨 【核心 Debug 機制】：如果狀態碼不是 200，直接在畫面上噴出大紅字
+        response = requests.get(url_new, headers=live_headers, timeout=8)
+        
+        # 偵錯看板
         if response.status_code != 200:
             st.error(f"🔺 雲端讀取失敗！狀態碼: {response.status_code}")
             st.error(f"💬 Supabase 拒絕原因: {response.text}")
             return []
             
         raw_list = response.json()
-        
-        # 🚨 如果狀態碼是 200 但回傳的陣列是空的，代表真的撈不到
-        if len(raw_list) == 0:
-            st.warning(f"⚠️ 連線成功(200)，但 Supabase 回傳了空的資料陣列。請檢查資料表名稱是否為: {TABLE_NAME}")
-            
         clean_list = []
         for row in raw_list:
             fsize_val = row.get("filesize")
-            # 🪐 萬能極致包容：不管是哪個欄位是 NULL，一律給予安全預設值，絕對不讓資料蒸發
             safe_row = {
                 "id": row.get("id", 0),
                 "filename": row.get("filename") if row.get("filename") else "未命名 3D 資產",
                 "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "vertices": 45000,  
-                "faces": 90000,
-                "dimensions": row.get("dimensions") if row.get("dimensions") else (row.get("dimensions") if "dimensions" in row else "180.0 x 120.0 x 160.0 mm"),
+                "vertices": int(row.get("vertices")) if row.get("vertices") is not None else 45000,  
+                "faces": int(row.get("faces")) if row.get("faces") is not None else 90000,
+                "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
                 "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。",
                 "filesize": str(fsize_val) if fsize_val else ""
             }
             clean_list.append(safe_row)
         return clean_list
     except Exception as e:
-        st.error(f"🔺 Python 執行讀取時發生連線中斷異常: {str(e)}")
+        st.error(f"🔺 Python 讀取異常: {str(e)}")
         return []
 
 def upload_to_supabase_storage(file_name, file_bytes):
@@ -197,7 +198,7 @@ with tab1:
                 st.stop()
 
     # ------------------------------------------------------------------------------ #
-    # 🔍 3D 雲端資產搜尋儀表板
+    # 🔍 3D 雲端資產搜尋儀表板 (極速零解讀阻礙)
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
@@ -253,3 +254,26 @@ with tab1:
                                 """
                                 st.components.v1.html(html_canvas, height=330)
                     st.markdown("<hr style='margin: 10px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
+        else:
+            st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
+    else:
+        st.info("📦 當前雲端大數據倉儲尚無任何資產，請於上方上傳首個 3D 模型檔案。")
+
+# ------------------------------------------------------------------------------ #
+# 分頁二：Scaniverse 智慧診斷日誌
+# ------------------------------------------------------------------------------ #
+with tab2:
+    st.subheader("🤖 大數據中心跨資產綜合分析日誌")
+    if cloud_data:
+        recent_assets = cloud_data[:3]
+        assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')}" for index, item in enumerate(recent_assets)]
+        all_assets_context = "\n".join(assets_summary_list)
+        if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
+            with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
+                try:
+                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
+                    response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[intelligence_prompt])
+                    st.session_state["cached_diagnostic_report"] = response.text
+                except Exception: st.error("🧠 雲端繁忙，請稍候再試。")
+        if "cached_diagnostic_report" in st.session_state:
+            st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
