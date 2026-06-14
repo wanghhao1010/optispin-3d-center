@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [功能全歸位・動態雙軌防禦完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [3D 預覽 + 高科技點雲・全量復活完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -9,6 +9,7 @@ import os
 import time
 import io
 import requests  
+import base64
 import plotly.graph_objects as go
 from datetime import datetime
 from google import genai
@@ -42,9 +43,9 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 動態雙軌流道：把 filesize 拿回來，但自動斬斷超長 Base64，完美通車並保全預覽按鈕！"""
+    """🚀 雙軌防護讀取端：保留完整 filesize 以供 3D 畫布逆向還原"""
     try:
-        # 把 filesize 重新納入 select，以便讓新資料能夠順利讀取 Storage 網址
+        # 完美捞取所有核心栏位
         fields = "id,filename,timestamp,filesize,dimensions,ai_diagnosis"
         url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc"
         
@@ -56,7 +57,6 @@ def fetch_lightweight_assets():
         response = requests.get(url_new, headers=live_headers, timeout=12)
         
         if response.status_code != 200:
-            st.error(f"🔺 雲端讀取失敗！狀態碼: {response.status_code}")
             return []
             
         raw_list = response.json()
@@ -66,13 +66,6 @@ def fetch_lightweight_assets():
             if fsize_val is None:
                 fsize_val = ""
                 
-            # 🎯 【超聰明防爆過濾】：如果發現欄位長度太長（大於1000字，代表是以前卡死主機的 Base64 亂碼舊資料）
-            # 我們直接在前端抹平它，防止傳輸超時；如果是一般 http 短網址，就完美保留通車！
-            if len(str(fsize_val)) > 1000:
-                final_url = ""
-            else:
-                final_url = str(fsize_val)
-                
             safe_row = {
                 "id": row.get("id", 0),
                 "filename": row.get("filename") if row.get("filename") else "未命名 3D 資產",
@@ -81,7 +74,7 @@ def fetch_lightweight_assets():
                 "faces": 90000,
                 "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
                 "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。",
-                "filesize": final_url  # 安全過濾後的乾淨網址
+                "filesize": str(fsize_val)  # 保留完整文字流以供前端 3D 渲染
             }
             clean_list.append(safe_row)
         return clean_list
@@ -116,7 +109,6 @@ st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生管理�
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
-# 現場即時輕量化撈取名單
 cloud_data = fetch_lightweight_assets()
 
 # ------------------------------------------------------------------------------ #
@@ -202,7 +194,7 @@ with tab1:
                 st.stop()
 
     # ------------------------------------------------------------------------------ #
-    # 🔍 3D 雲端資產搜尋儀表板 (雙軌預覽功能完美復活)
+    # 🔍 3D 雲端資產搜尋儀表板 (雙功能強勢歸位)
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
@@ -216,7 +208,7 @@ with tab1:
                 with st.container():
                     fname = item.get('filename')
                     asset_id = item.get('id')
-                    file_url = item.get('filesize', '')
+                    raw_file_url = item.get('filesize', '')
                     is_usdz = str(fname).lower().endswith('.usdz')
                     
                     st.markdown(f"#### 📄 檔案: {fname}")
@@ -231,25 +223,19 @@ with tab1:
                     mesh_toggle_key = f"toggle_mesh_{asset_id}"
                     pc_toggle_key = f"toggle_pc_{asset_id}"
 
-                    # 🪐 雙軌功能按鈕完美歸位！
+                    # 🪐 核心修正：取消所有 if 限制，按鈕強制 100% 亮出！
                     view_col1, view_col2, del_col = st.columns([1.2, 1.2, 1])
                     with view_col1:
-                        if file_url and file_url.startswith("http"):
-                            if st.button(f"🛰️ 實體全貼圖", key=f"btn_m_{asset_id}", use_container_width=True):
-                                st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
-                                st.session_state[pc_toggle_key] = False
-                                st.rerun()
-                        else:
-                            st.button("🔺 舊測試條目", key=f"btn_m_{asset_id}", disabled=True, use_container_width=True)
+                        if st.button(f"🛰️ 3D 模型實體", key=f"btn_m_{asset_id}", use_container_width=True):
+                            st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
+                            st.session_state[pc_toggle_key] = False
+                            st.rerun()
                             
                     with view_col2:
-                        if file_url and file_url.startswith("http"):
-                            if st.button(f"🌌 模擬點雲", key=f"btn_pc_{asset_id}", use_container_width=True):
-                                st.session_state[pc_toggle_key] = not st.session_state.get(pc_toggle_key, False)
-                                st.session_state[mesh_toggle_key] = False
-                                st.rerun()
-                        else:
-                            st.button("🔺 無圖檔模型", key=f"btn_pc_{asset_id}", disabled=True, use_container_width=True)
+                        if st.button(f"🌌 模擬單色點雲", key=f"btn_pc_{asset_id}", use_container_width=True):
+                            st.session_state[pc_toggle_key] = not st.session_state.get(pc_toggle_key, False)
+                            st.session_state[mesh_toggle_key] = False
+                            st.rerun()
 
                     with del_col:
                         if st.button(f"🗑️ 銷毀", key=f"del_{asset_id}", use_container_width=True):
@@ -258,37 +244,74 @@ with tab1:
                             time.sleep(0.5)
                             st.rerun()
 
+                    # 🛠️ 雙軌智能解析渲染引擎面
                     with canvas_slot:
-                        # 1. 實體全貼圖渲染層
-                        if st.session_state.get(mesh_toggle_key, False) and file_url:
+                        # 🎯 建立格式分流器：辨識到底是要讀 http 短網址還是還原 Base64
+                        if raw_file_url.startswith("http"):
+                            render_src = raw_file_url
+                            is_base64_mode = False
+                        else:
+                            render_src = f"data:application/octet-stream;base64,{raw_file_url}" if raw_file_url else ""
+                            is_base64_mode = True
+
+                        # 1. 實體圖層
+                        if st.session_state.get(mesh_toggle_key, False) and render_src:
                             if is_usdz:
-                                st.success("🍏 iOS 原生 AR 投放通路已就緒！")
-                                st.link_button("📱 點擊此處 → 立即啟動 iPhone 官方空間 AR 投放", url=file_url, use_container_width=True, type="primary")
+                                if is_base64_mode:
+                                    st.warning("🍏 USDZ 格式請使用全新上傳通道，即可解鎖 1:1 官方 AR 投放功能！")
+                                else:
+                                    st.success("🍏 iOS 原生 AR 投放通路已就緒！")
+                                    st.link_button("📱 點擊此處 → 立即啟動 iPhone 官方空間 AR 投放", url=render_src, use_container_width=True, type="primary")
                             else:
                                 html_canvas = f"""
                                 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-                                <model-viewer src="{file_url}" alt="OptiSpin GLB" camera-controls auto-rotate style="width: 100%; height: 320px; background-color: #1a1a1a; border-radius: 10px;"></model-viewer>
+                                <model-viewer src="{render_src}" alt="OptiSpin" camera-controls auto-rotate style="width: 100%; height: 320px; background-color: #1a1a1a; border-radius: 10px;"></model-viewer>
                                 """
                                 st.components.v1.html(html_canvas, height=330)
 
-                        # 2. 模擬單色點雲高科技渲染層
-                        if st.session_state.get(pc_toggle_key, False) and file_url:
+                        # 2. 模擬點雲圖層
+                        if st.session_state.get(pc_toggle_key, False) and render_src:
                             if is_usdz:
                                 st.warning("🌌 點雲模擬目前專屬於工業 GLB 格式！")
                             else:
-                                with st.spinner("🌌 正在逆向還原高科技點雲..."):
+                                with st.spinner("🌌 正在精準逆向還原高科技點雲..."):
                                     try:
-                                        res_file = requests.get(file_url, timeout=15)
-                                        scene_or_m = trimesh.load(io.BytesIO(res_file.content), file_type='glb')
+                                        if is_base64_mode:
+                                            file_content = base64.b64decode(raw_file_url)
+                                        else:
+                                            res_file = requests.get(render_src, timeout=15)
+                                            file_content = res_file.content
+                                            
+                                        scene_or_m = trimesh.load(io.BytesIO(file_content), file_type='glb')
                                         c_mesh = list(scene_or_m.geometry.values())[0] if isinstance(scene_or_m, trimesh.Scene) else scene_or_m
                                         indices = np.random.choice(len(c_mesh.vertices), min(len(c_mesh.vertices), 1500), replace=False)
                                         pts = c_mesh.vertices[indices] * 1000.0
-                                        fig = go.Figure(data=[go.Scatter3d(x=pts[:, 0], y=pts[:, 1], z=pts[:, 2], mode='markers', marker=dict(size=2.5, color='#00f0ff', opacity=0.85))])
+                                        fig = go.Figure(data=[go.Scatter3d(x=pts[:, 0], y=pts[:, 1], z=pts[:, 2], mode='markers', marker=dict(size=2.5, color='#ffffff', opacity=0.85))])
                                         fig.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), bgcolor="black"), margin=dict(r=0, l=0, b=0, t=0), paper_bgcolor="black", height=320)
                                         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                                    except Exception: st.error("🔺 點雲拓撲還原超時")
+                                    except Exception as e: 
+                                        st.error(f"🔺 點雲拓撲還原超時: {str(e)}")
                     st.markdown("<hr style='margin: 10px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
         else:
             st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
     else:
         st.info("📦 當前雲端大數據倉儲尚無任何資產，請於上方上傳首個 3D 模型檔案。")
+
+# ------------------------------------------------------------------------------ #
+# 分頁二：Scaniverse 智慧診斷日誌
+# ------------------------------------------------------------------------------ #
+with tab2:
+    st.subheader("🤖 大數據中心跨資產綜合分析日誌")
+    if cloud_data:
+        recent_assets = cloud_data[:3]
+        assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')}" for index, item in enumerate(recent_assets)]
+        all_assets_context = "\n".join(assets_summary_list)
+        if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
+            with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
+                try:
+                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
+                    response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[intelligence_prompt])
+                    st.session_state["cached_diagnostic_report"] = response.text
+                except Exception: st.error("🧠 雲端繁忙，請稍候再試。")
+        if "cached_diagnostic_report" in st.session_state:
+            st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
