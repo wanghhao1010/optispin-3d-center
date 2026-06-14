@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [資料庫連線完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [Supabase v2 新版語法完全相容版]
 # ============================================================================== #
 
 import streamlit as st
@@ -15,7 +15,7 @@ from supabase import create_client, Client
 from google import genai
 from google.genai import types
 
-# 1. 系統網頁頂層基礎配置 (徹底拔除會導致破圖的裝飾)
+# 1. 系統網頁頂層基礎配置
 st.set_page_config(
     page_title="OptiSpin 3D 控制中心",
     page_icon="🛸",
@@ -23,7 +23,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 初始化刪除 Session 狀態
 if "optimistic_deleted_ids" not in st.session_state:
     st.session_state.optimistic_deleted_ids = set()
 
@@ -33,35 +32,33 @@ try:
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     
-    # 初始化雲端資料庫與 AI 客戶端
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception as e:
-    st.error("❌ 偵測到雲端 Secrets 設定缺失！請確認 Streamlit Cloud 的 Advanced Settings 已正確配置。")
+    st.error("❌ 偵測到雲端 Secrets 設定缺失！請確認 Streamlit Cloud 配置。")
     st.stop()
 
-# 雲端資料庫儲存桶 (Bucket) 名稱定義
 BUCKET_MODELS = "saved-models"
 
 # 3. 雲端資料庫與資料核心交互工人
 def fetch_cloud_assets():
-    """從 Supabase Database 撈取所有未被標記刪除的 3D 大數據資產"""
+    """從 Supabase Database 撈取所有 3D 大數據資產"""
     try:
-        # 修正表格名稱為正確的關聯表，並改用通用時間排序避開不存在的欄位
-        response = supabase.table("optispin_assets").select("*").order("created_at", descending=True).execute()
+        # 修正新版套件語法：將 descending=True 改為 desc=True
+        response = supabase.table("optispin_assets").select("*").order("created_at", desc=True).execute()
         return [row for row in response.data if row["id"] not in st.session_state.optimistic_deleted_ids]
     except Exception as e:
-        # 如果 optispin_assets 讀不到，自動切換至備用表格名稱
         try:
-            response = supabase.table("models").select("*").execute()
+            response = supabase.table("optispin_assets").select("*").execute()
             return response.data
-        except:
-            st.error(f"⚠️ 無法讀取資料庫資產，請確認 Supabase Table 名稱是否正確: {str(e)}")
+        except Exception as e2:
+            st.error(f"⚠️ 無法讀取資料庫資產: {str(e2)}")
             return []
 
 def upload_to_supabase_storage(bucket_name: str, file_path: str, file_data: bytes):
-    """將二進位檔案資料直接儲存至 Supabase Storage"""
+    """將檔案資料儲存至 Supabase Storage"""
     try:
+        # 新版套件回傳格式為 dict 或 response，這裡我們只關注是否拋出異常
         supabase.storage.from_(bucket_name).upload(
             path=file_path,
             file=file_data,
@@ -69,6 +66,9 @@ def upload_to_supabase_storage(bucket_name: str, file_path: str, file_data: byte
         )
         return True
     except Exception as e:
+        # 如果因為重複上傳導致報錯，也視為成功或進行捕捉
+        if "Duplicate" in str(e) or "already exists" in str(e).lower():
+            return True
         st.error(f"💥 Storage 儲存失敗: {str(e)}")
         return False
 
@@ -76,15 +76,13 @@ def upload_to_supabase_storage(bucket_name: str, file_path: str, file_data: byte
 # 🎨 核心主網頁前端 UI 渲染
 # ============================================================================== #
 
-# 頂部控制中心標題區塊 (乾淨俐落)
 st.title("🛸 OptiSpin 3D 控制中心")
 st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生與自動化數據管理端")
 
-# 功能主分頁切換介面
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
 # ------------------------------------------------------------------------------ #
-# 分頁一：3D 大數據資產管理端 (上傳、網格解析、動態檢索)
+# 分頁一：3D 大數據資產管理端
 # ------------------------------------------------------------------------------ #
 with tab1:
     st.subheader("📥 點擊或拖曳上傳全新 3D 掃描模型")
@@ -122,10 +120,11 @@ with tab1:
                         bbox = mesh.bounding_box.extents
                         bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
                 except Exception as mesh_err:
-                    st.warning(f"⚠️ 幾何核心成功備份檔案，但拓撲結構解析受限: {str(mesh_err)}")
+                    st.warning(f"⚠️ 幾何拓撲解析受限: {str(mesh_err)}")
 
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             unique_filename = f"{timestamp}_{file_name}"
+            
             success = upload_to_supabase_storage(BUCKET_MODELS, unique_filename, file_bytes)
             
             if success:
@@ -164,20 +163,19 @@ with tab1:
                         "ai_diagnosis": diagnosis_text,
                         "created_at": datetime.now().isoformat()
                     }
-                    # 嘗試寫入，若表格名稱不對會自動捕捉
                     supabase.table("optispin_assets").insert(asset_row).execute()
                     st.success(f"🎉 檔案 {file_name} 雲端大數據資產配置成功！")
                     time.sleep(1)
                     st.rerun()
                 except Exception as db_err:
-                    st.error(f"資料庫寫入阻斷，請檢查 Supabase Table 名稱: {str(db_err)}")
+                    st.error(f"資料庫寫入阻斷，請檢查儲存格設定: {str(db_err)}")
 
     # ------------------------------------------------------------------------------ #
     # 雲端動態搜尋與幾何資產儀表板
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     st.subheader("🔍 3D 雲端資產動態搜尋倉儲")
-    search_query = st.text_input("搜尋資產名稱或格式", placeholder="輸入關鍵字進行動態搜尋篩選...")
+    search_query = st.text_input("搜尋資產名稱或格式", placeholder="輸入關鍵字進行動態搜尋篩選...", label_visibility="collapsed")
     
     cloud_data = fetch_cloud_assets()
     if cloud_data:
@@ -197,6 +195,16 @@ with tab1:
                         st.metric("邊界包絡體 (Bounding Box)", item.get('bounding_box', '無法計算'))
                     
                     st.info(f"**🤖 Gemini 智慧製程評估報告：**\n{item.get('ai_diagnosis', '無診斷數據')}")
+                    
+                    if st.button(f"🗑️ 銷毀資產", key=f"del_{item.get('id')}"):
+                        try:
+                            st.session_state.optimistic_deleted_ids.add(item.get('id'))
+                            supabase.table("optispin_assets").delete().eq("id", item.get('id')).execute()
+                            st.toast(f"已從雲端銷毀")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as del_err:
+                            st.error(f"銷毀指令失敗: {str(del_err)}")
                     st.markdown("<hr style='margin: 10px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
         else:
             st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
@@ -208,7 +216,7 @@ with tab1:
 # ------------------------------------------------------------------------------ #
 with tab2:
     st.subheader("📸 全自動點雲最佳化與 AI 多模態互動")
-    chat_input = st.text_input("📝 向大數據中心 AI 提問 (例如：如何提升 Scaniverse 機械件掃描清澈度？)")
+    chat_input = st.text_input("📝 向大數據中心 AI 提問", placeholder="例如：如何提升 Scaniverse 機械件掃描清澈度？")
     if chat_input:
         with st.spinner("🤖 正在將多模態日誌交由 Gemini 頂級思維矩陣解析..."):
             try:
