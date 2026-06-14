@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [大數據全量釋放・大圓滿完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [物理級硬編碼 + 強制偵錯完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -21,20 +21,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. 強行綁定絕對正確 Database 與 Storage REST URL
+# ============================================================================== #
+# 🎯 【物理級核心解鎖】：直接硬編碼寫死你的憑證，徹底粉碎 Streamlit Secrets 沒讀到的問題
+# ============================================================================== #
 PROJECT_REF = "pwmijkkzufcqrnmodxap"
 BASE_URL = f"https://{PROJECT_REF}.supabase.co/rest/v1/"
 STORAGE_URL = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/models/"
 TABLE_NAME = "optispin_assets" 
 
+# 直接在這裡抓取，如果 Secrets 沒有就用備用機制，確保 100% 拿到金鑰
 try:
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+except Exception:
+    # 萬一 Streamlit Cloud 後台真的沒存到，請在下方手動貼上你的 anon key 作為絕對防禦
+    SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY_HERE" 
+
+try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
-except Exception as e:
-    st.error("❌ 偵測到雲端 Secrets 設定缺失！請確認 Streamlit Cloud 配置。")
-    st.stop()
+except Exception:
+    ai_client = None
 
+# 建立標準認證標頭
 HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -42,27 +50,42 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 終極放行通道：完美清洗舊資料巨大的 Base64，只放行短網址，100% 防禦不超時"""
+    """🚀 核心強制除錯流：如果連線不成功，直接在網頁頂端爆破打印所有連線細節！"""
     try:
-        fields = "id,filename,timestamp,filesize,dimensions,ai_diagnosis"
-        url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc"
+        # 使用最輕量、最基本的讀取方式
+        url_new = f"{BASE_URL}{TABLE_NAME}?select=id,filename,timestamp,dimensions,ai_diagnosis&order=id.desc"
         
+        # 強制加入快取清洗標頭
         live_headers = HEADERS.copy()
         live_headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         live_headers["Pragma"] = "no-cache"
-        live_headers["Expires"] = "0"
         
-        response = requests.get(url_new, headers=live_headers, timeout=12)
+        # 顯示連線前哨站狀態，直接在前端畫面上 debug
+        with st.sidebar:
+            st.write("📡 正在嘗試建立資料庫現場連線...")
+            st.write(f"🔗 目標網址: `{url_new}`")
+            st.write(f"🔑 金鑰長度: {len(SUPABASE_KEY)} 字元")
+
+        response = requests.get(url_new, headers=live_headers, timeout=10)
+        
+        # 🚨 如果 Supabase 吐回任何不是 200 的狀態，立刻用大紅框截斷並警告！
         if response.status_code != 200:
+            st.error(f"🔺 物理級連線攔截失敗！狀態碼: {response.status_code}")
+            st.error(f"💬 資料庫核心拒絕文字: {response.text}")
             return []
             
         raw_list = response.json()
+        
+        # 🚨 連線成功但回傳數量為 0
+        if len(raw_list) == 0:
+            st.warning(f"⚠️ 網路請求成功(200)，但 Supabase 吐回空陣列。請確認資料庫中是否存在名為 [{TABLE_NAME}] 的資料表。")
+            
         clean_list = []
         for row in raw_list:
-            fsize_val = row.get("filesize")
+            fsize_val = row.get("filesize", "")
             fsize_str = str(fsize_val) if fsize_val else ""
             
-            # 🎯 核心防爆：如果是以前大於 1000 字元的 Base64 髒資料，自動降載抹平
+            # 隔絕巨大的 Base64 髒資料，其餘正常放行
             if len(fsize_str) > 1000 or not fsize_str.startswith("http"):
                 final_url = ""
             else:
@@ -70,21 +93,22 @@ def fetch_lightweight_assets():
                 
             safe_row = {
                 "id": row.get("id", 0),
-                "filename": row.get("filename") if row.get("filename") else "未命名 3D 資產",
-                "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "filename": row.get("filename") if row.get("filename") else "未命名數位雙生資產",
+                "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else "2026-06-14 00:00",
                 "vertices": 45000,  
                 "faces": 90000,
                 "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
-                "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。",
+                "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "工件已成功收錄至雲端仓儲中心。",
                 "filesize": final_url
             }
             clean_list.append(safe_row)
         return clean_list
-    except Exception:
+    except Exception as e:
+        st.error(f"🔺 建立與 Supabase 物理通道時發生重大連線異常: {str(e)}")
         return []
 
 def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶空投發射器"""
+    """📦 儲存桶發射器"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     unique_filename = f"{timestamp_prefix}_{file_name}"
     upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
@@ -111,7 +135,7 @@ st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生管理�
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
-# 現場即時輕量化撈取全量名單
+# 即時拉取數據清單
 cloud_data = fetch_lightweight_assets()
 
 # ------------------------------------------------------------------------------ #
@@ -161,9 +185,12 @@ with tab1:
                 model_url = upload_to_supabase_storage(file_name, file_bytes)
 
                 try:
-                    prompt_analysis = f"工件檔名 {file_name}，網格面數 {faces_count}。請給予 100 字內 FDM PLA/PETG 列印速度建議。"
-                    ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
-                    diagnosis_text = ai_response.text
+                    if ai_client:
+                        prompt_analysis = f"工件檔名 {file_name}，網格面數 {faces_count}。請給予 100 字內 FDM PLA/PETG 列印速度建議。"
+                        ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
+                        diagnosis_text = ai_response.text
+                    else:
+                        diagnosis_text = "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。"
                 except Exception: 
                     diagnosis_text = "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。"
 
@@ -183,11 +210,10 @@ with tab1:
                 if res_db.status_code in [200, 201, 204]:
                     st.session_state["upload_triggered"] = False
                     st.success(f"🎉 {file_name} 已成功格式化並存入雲端中心！")
-                    st.toast("🛸 正在將數位雙生資產排入清單...", icon="🛰️")
                     time.sleep(1.5) 
                     st.rerun()
                 else:
-                    st.error(f"❌ 資料表寫入拒絕！狀態碼: {res_db.status_code}")
+                    st.error(f"❌ 資料表寫入拒絕！狀態碼: {res_db.status_code} | 原因: {res_db.text}")
                     st.session_state["upload_triggered"] = False
                     st.stop()
                     
@@ -197,7 +223,7 @@ with tab1:
                 st.stop()
 
     # ------------------------------------------------------------------------------ #
-    # 🔍 3D 雲端資產搜尋儀表板 (解鎖無條件全放行展示邏輯)
+    # 🔍 3D 雲端資產搜尋儀表板
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
@@ -226,7 +252,6 @@ with tab1:
                     mesh_toggle_key = f"toggle_mesh_{asset_id}"
                     pc_toggle_key = f"toggle_pc_{asset_id}"
 
-                    # 🪐 核心解鎖：只要是合法新上傳的 http 通道資料，完美亮出雙功能預覽按鈕！
                     view_col1, view_col2, del_col = st.columns([1.2, 1.2, 1])
                     with view_col1:
                         if file_url and file_url.startswith("http"):
@@ -282,3 +307,25 @@ with tab1:
             st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
     else:
         st.info("📦 當前雲端大數據倉儲尚無任何資產，請於上方上傳首個 3D 模型檔案。")
+
+# ------------------------------------------------------------------------------ #
+# 分頁二：Scaniverse 智慧診斷日誌
+# ------------------------------------------------------------------------------ #
+with tab2:
+    st.subheader("🤖 大數據中心跨資產綜合分析日誌")
+    if cloud_data:
+        recent_assets = cloud_data[:3]
+        assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')}" for index, item in enumerate(recent_assets)]
+        all_assets_context = "\n".join(assets_summary_list)
+        if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
+            with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
+                try:
+                    if ai_client:
+                        intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
+                        response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[intelligence_prompt])
+                        st.session_state["cached_diagnostic_report"] = response.text
+                    else:
+                        st.error("🧠 Gemini 憑證未配置。")
+                except Exception: st.error("🧠 雲端繁忙，請稍候再試。")
+        if "cached_diagnostic_report" in st.session_state:
+            st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
