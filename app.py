@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [REST API 資料庫完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [REST API 完整完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -8,7 +8,8 @@ import trimesh
 import os
 import time
 import io
-import requests  # 引入原生請求，確保 REST API 絕對暢通
+import requests  # 確保 REST API 絕對暢通
+import base64
 from datetime import datetime
 from google import genai
 
@@ -21,7 +22,6 @@ st.set_page_config(
 )
 
 # 2. 強行綁定你提供的絕對正確 Database REST URL
-# 砍掉所有會干擾的舊變數，直接走你的正確通路！
 BASE_URL = "https://pwmijkkzufcqrnmodxap.supabase.co/rest/v1/"
 
 try:
@@ -44,20 +44,19 @@ HEADERS = {
 def fetch_cloud_assets():
     """使用精準的 REST URL 撈取資料表數據"""
     try:
-        # 直接對準你的正確路徑，存取 optispin_assets 資料表
-        url = f"{BASE_URL}optispin_assets?select=*"
+        # 直接對準正確路徑，存取 optispin_assets 資料表，並依照時間降序排列
+        url = f"{BASE_URL}optispin_assets?select=*&order=created_at.desc"
         response = requests.get(url, headers=HEADERS)
         if response.status_code == 200:
             return response.json()
         else:
-            # 備用方案：如果表格名稱是 models
-            url_backup = f"{BASE_URL}models?select=*"
+            # 備用方案
+            url_backup = f"{BASE_URL}optispin_assets?select=*"
             res_backup = requests.get(url_backup, headers=HEADERS)
             if res_backup.status_code == 200:
                 return res_backup.json()
             return []
     except Exception as e:
-        st.error(f"⚠️ REST 讀取失敗: {str(e)}")
         return []
 
 # ============================================================================== #
@@ -81,93 +80,89 @@ with tab1:
     )
     
     if uploaded_file is not None:
-        with st.spinner("🚀 正在進行幾何拓撲解析與大數據封裝..."):
-            file_bytes = uploaded_file.read()
-            file_name = uploaded_file.name
-            file_extension = os.path.splitext(file_name)[1].lower()
-            
-            vertices_count = 0
-            faces_count = 0
-            bounding_box_str = "無法計算"
-            area_val, volume_val = 0.0, 0.0
-            
-            if file_extension in [".obj", ".stl", ".glb"]:
-                try:
-                    file_stream = io.BytesIO(file_bytes)
-                    scene_or_mesh = trimesh.load(file_stream, file_type=file_extension.strip('.'))
-                    if isinstance(scene_or_mesh, trimesh.Scene):
-                        mesh = list(scene_or_mesh.geometry.values())[0] if len(scene_or_mesh.geometry) > 0 else None
-                    else:
-                        mesh = scene_or_mesh
+        # 使用一個唯一的 Key 來防止重複觸發上傳
+        upload_key = f"processed_{uploaded_file.name}_{uploaded_file.size}"
+        
+        if upload_key not in st.session_state:
+            with st.spinner("🚀 正在進行幾何拓撲解析與大數據封裝..."):
+                file_bytes = uploaded_file.read()
+                file_name = uploaded_file.name
+                file_extension = os.path.splitext(file_name)[1].lower()
+                
+                vertices_count = 0
+                faces_count = 0
+                bounding_box_str = "無法計算"
+                area_val, volume_val = 0.0, 0.0
+                
+                # 執行 3D 幾何結構解析
+                if file_extension in [".obj", ".stl", ".glb"]:
+                    try:
+                        file_stream = io.BytesIO(file_bytes)
+                        scene_or_mesh = trimesh.load(file_stream, file_type=file_extension.strip('.'))
+                        if isinstance(scene_or_mesh, trimesh.Scene):
+                            mesh = list(scene_or_mesh.geometry.values())[0] if len(scene_or_mesh.geometry) > 0 else None
+                        else:
+                            mesh = scene_or_mesh
+                            
+                        if mesh is not None:
+                            vertices_count = len(mesh.vertices)
+                            faces_count = len(mesh.faces)
+                            area_val = float(mesh.area)
+                            volume_val = float(mesh.volume) if mesh.is_volume else 0.0
+                            bbox = mesh.bounding_box.extents
+                            bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
+                    except Exception as mesh_err:
+                        st.warning(f"⚠️ 幾何結構解析受限: {str(mesh_err)}")
+
+                # 調度 Gemini 進行工業診斷
+                with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
+                    try:
+                        prompt_analysis = f"""
+                        你是一位精通精密機械加工、3D列印(PLA/PETG)與自動化量測的工業專家。
+                        當前系統剛接收到一個自動化 3D 掃描模型，特徵如下：
+                        - 檔案名稱: {file_name}
+                        - 幾何頂點數: {vertices_count}
+                        - 網格面數: {faces_count}
+                        - 邊界尺寸: {bounding_box_str}
                         
-                    if mesh is not None:
-                        vertices_count = len(mesh.vertices)
-                        faces_count = len(mesh.faces)
-                        area_val = float(mesh.area)
-                        volume_val = float(mesh.volume) if mesh.is_volume else 0.0
-                        bbox = mesh.bounding_box.extents
-                        bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
-                except Exception as mesh_err:
-                    st.warning(f"⚠️ 幾何幾何結構解析受限: {str(mesh_err)}")
+                        請針對該幾何數據給出結構診斷：
+                        1. 推測該工件可能屬於哪類機械零組件？
+                        2. 若此工件使用 3D列印 製作，有何結構限制建議？
+                        回答請維持在 100 字內，條列式精簡專業。
+                        """
+                        ai_response = ai_client.models.generate_content(
+                            model='gemini-2.5-flash',
+                            contents=prompt_analysis
+                        )
+                        diagnosis_text = ai_response.text
+                    except Exception as ai_err:
+                        diagnosis_text = f"Gemini 專家系統調度失敗。{str(ai_err)}"
 
-            # 將檔案轉為 Base64 字符串，直接塞進資料庫欄位
-            encoded_file = base64.b64encode(file_bytes).decode('utf-8') if 'base64' in globals() else ""
-
-            with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
+                # 透過原生 REST API 打向你的 Supabase 資料表
                 try:
-                    prompt_analysis = f"""
-                    你是一位精通精密機械加工、3D列印(PLA/PETG)與自動化量測的工業專家。
-                    當前系統剛接收到一個自動化 3D 掃描模型，特徵如下：
-                    - 檔案名稱: {file_name}
-                    - 幾何頂點數: {vertices_count}
-                    - 網格面數: {faces_count}
-                    - 邊界尺寸: {bounding_box_str}
+                    asset_row = {
+                        "filename": file_name,
+                        "vertices": int(vertices_count),
+                        "faces": int(faces_count),
+                        "bounding_box": bounding_box_str,
+                        "surface_area": float(area_val),
+                        "volume": float(volume_val),
+                        "ai_diagnosis": diagnosis_text,
+                        "created_at": datetime.now().isoformat()
+                    }
                     
-                    請針對該幾何數據給出結構診斷：
-                    1. 推測該工件可能屬於哪類機械零組件？
-                    2. 若此工件使用 3D列印 製作，有何結構限制建議？
-                    回答請維持在 100 字內，條列式精簡專業。
-                    """
-                    ai_response = ai_client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt_analysis
-                    )
-                    diagnosis_text = ai_response.text
-                except Exception as ai_err:
-                    diagnosis_text = f"Gemini 專家系統調度失敗。診斷代碼: {str(ai_err)}"
-
-            # 透過 REST API 寫入資料表
-            try:
-                asset_row = {
-                    "filename": file_name,
-                    "vertices": vertices_count,
-                    "faces": faces_count,
-                    "bounding_box": bounding_box_str,
-                    "surface_area": area_val,
-                    "volume": volume_val,
-                    "ai_diagnosis": diagnosis_text,
-                    "created_at": datetime.now().isoformat()
-                }
-                
-                # 直接打向你指定的正確 REST 節點
-                post_url = f"{BASE_URL}optispin_assets"
-                res_post = requests.post(post_url, headers=HEADERS, json=asset_row)
-                
-                if res_post.status_code in [200, 201]:
-                    st.success(f"🎉 檔案 {file_name} 透過真實 REST URL 寫入成功！")
-                    time.sleep(1)
-                    st.rerun()
-                else:
-                    # 試試看另一個備用資料表
-                    res_post_backup = requests.post(f"{BASE_URL}models", headers=HEADERS, json=asset_row)
-                    if res_post_backup.status_code in [200, 201]:
-                        st.success(f"🎉 檔案 {file_name} 寫入 models 資料表成功！")
-                        time.sleep(1)
-                        st.rerun()
+                    post_url = f"{BASE_URL}optispin_assets"
+                    res_post = requests.post(post_url, headers=HEADERS, json=asset_row)
+                    
+                    if res_post.status_code in [200, 201, 204]:
+                        st.session_state[upload_key] = True
+                        st.success(f"🎉 檔案 {file_name} 寫入成功！正在刷新儀表板...")
+                        time.sleep(0.8)
+                        st.rerun()  # 🛠️ 強制重整網頁，終結轉圈圈狀態！
                     else:
-                        st.error(f"❌ 寫入失敗，請確認資料表欄位設定。代碼: {res_post.text}")
-            except Exception as db_err:
-                st.error(f"資料庫寫入阻斷: {str(db_err)}")
+                        st.error(f"❌ 寫入失敗，代碼: {res_post.status_code}, 內容: {res_post.text}")
+                except Exception as db_err:
+                    st.error(f"資料庫通訊阻斷: {str(db_err)}")
 
     # ------------------------------------------------------------------------------ #
     # 雲端動態搜尋與幾何資產儀表板
