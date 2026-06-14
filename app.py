@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [Supabase 25筆歷史數據強行全還原完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [欄位精準校正最終完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -41,10 +41,10 @@ HEADERS = {
 }
 
 def fetch_cloud_assets():
-    """終極盲測撈取：不設任何 if 條件攔截，有多少筆就強行吐出多少筆"""
+    """撈取資料表數據（改用存在且合法的 id 欄位進行最新排序）"""
     try:
-        # 強制指定 select=* 撈取全量欄位
-        url_new = f"{BASE_URL}optispin_assets?select=*&order=created_at.desc"
+        # 🛠️ 關鍵修復：order=id.desc 替換掉原本不存在的 created_at
+        url_new = f"{BASE_URL}optispin_assets?select=*&order=id.desc"
         response = requests.get(url_new, headers=HEADERS, timeout=12)
         if response.status_code == 200:
             return response.json()
@@ -92,7 +92,7 @@ st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生與自�
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
-# 載入資料庫內全部 25 筆數據
+# 載入資料庫歷史數據
 cloud_data = fetch_cloud_assets()
 
 # ------------------------------------------------------------------------------ #
@@ -166,6 +166,7 @@ with tab1:
 
                 with st.spinner("💾 正在向 Supabase 寫入全量數據..."):
                     try:
+                        # 🛠️ 關鍵修復：將時間寫入欄位改為對齊後台的 "timestamp" 欄位
                         asset_row = {
                             "filename": file_name,
                             "vertices": int(vertices_count),
@@ -175,7 +176,7 @@ with tab1:
                             "volume": float(volume_val),
                             "ai_diagnosis": diagnosis_text,
                             "filesize": base64_mesh,
-                            "created_at": datetime.now().isoformat()
+                            "timestamp": datetime.now().isoformat() 
                         }
                         
                         res_post = requests.post(f"{BASE_URL}optispin_assets", headers=HEADERS, json=asset_row, timeout=15)
@@ -185,7 +186,7 @@ with tab1:
                             time.sleep(0.5)
                             st.rerun()  
                         else:
-                            st.warning(f"⚠️ 寫入失敗代碼: {res_post.status_code}")
+                            st.warning(f"⚠️ 寫入失敗代碼: {res_post.status_code} | 原因: {res_post.text}")
                     except Exception as db_err:
                         st.error(f"❌ 資料庫通訊連線斷開: {str(db_err)}")
 
@@ -193,7 +194,6 @@ with tab1:
     # 雲端動態搜尋與幾何資產儀表板 (極致防禦渲染)
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
-    # 動態顯示當前撈到的真實總筆數，方便確認有沒有對上這 25 筆
     total_count = len(cloud_data) if cloud_data else 0
     st.subheader(f"🔍 3D 雲端資產動態搜尋倉儲 (目前雲端總計: {total_count} 筆)")
     
@@ -208,10 +208,10 @@ with tab1:
         if filtered_data:
             for item in filtered_data:
                 with st.container():
-                    raw_time = item.get('created_at', '')
+                    # 🛠️ 關鍵修復：從後台撈取對應的 "timestamp" 作為時間顯示
+                    raw_time = item.get('timestamp', '')
                     display_time = str(raw_time)[:16].replace('T', ' ') if raw_time else "未知時間"
                     
-                    # 使用最高防禦係數，防止欄位為 None 時閃退
                     fname = item.get('filename')
                     if not fname:
                         fname = f"未命名資產 (ID: {item.get('id', '未知')})"
@@ -222,10 +222,9 @@ with tab1:
                     st.markdown(f"#### 📄 檔案: {fname}")
                     st.caption(f"🕒 上傳時間: {display_time}")
                     
-                    # 💡 只有當 filesize 真的有大於 100 字元的 Base64 數據時，才去渲染 3D 畫布
                     if mesh_b64 and len(str(mesh_b64)) > 100:
                         if is_usdz:
-                            st.success("🍏 偵測到 iOS 專屬格式！已自動啟動手機原生 AR 擴增實境預覽模式")
+                            st.success("🍏 偵測到 iOS 專專屬格式！已自動啟動手機原生 AR 模式")
                             try:
                                 html_canvas = f"""
                                 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
@@ -276,7 +275,7 @@ with tab1:
                                     except Exception:
                                         st.caption("🔺 點雲生成受限")
                     else:
-                        st.warning("⚠️ 提示：此項資產在 Supabase 內僅存幾何數據，未快取 Base64 3D 模型實體二進位。")
+                        st.caption("ℹ️ 提示：此項歷史資產在 Supabase 內僅存文字幾何數據，未快取 Base64 3D 實體模型。")
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -325,3 +324,4 @@ with tab2:
         
         if "cached_diagnostic_report" in st.session_state:
             st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
+   
