@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [3D 動態雲點模型畫布完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [實體網格與雲點模擬雙模式完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -10,6 +10,7 @@ import time
 import io
 import requests  
 import base64
+import plotly.graph_objects as go
 from datetime import datetime
 from google import genai
 
@@ -50,6 +51,52 @@ def fetch_cloud_assets():
     except Exception:
         return []
 
+# 建立點雲模擬圖的函數
+def create_point_cloud_simulation(mesh):
+    """將網格頂點轉化為互動式的點雲模擬圖"""
+    try:
+        # 如果模型太輕，直接返回 None
+        if len(mesh.vertices) < 10:
+            return None
+            
+        # 為了效能，如果點數太多則進行降採樣
+        max_points = 5000
+        if len(mesh.vertices) > max_points:
+            indices = np.random.choice(len(mesh.vertices), max_points, replace=False)
+            points = mesh.vertices[indices]
+        else:
+            points = mesh.vertices
+            
+        # 建立 3D 散點圖 (Scatter3d)，模擬光達點雲效果
+        fig = go.Figure(data=[go.Scatter3d(
+            x=points[:, 0],
+            y=points[:, 1],
+            z=points[:, 2],
+            mode='markers',
+            marker=dict(
+                size=2,          # 細小的粒子
+                color='white',   # 模擬單色點雲
+                opacity=0.8
+            )
+        )])
+        
+        # 設定科技感的黑底佈局
+        fig.update_layout(
+            scene=dict(
+                xaxis=dict(visible=False, backgroundcolor="black"),
+                yaxis=dict(visible=False, backgroundcolor="black"),
+                zaxis=dict(visible=False, backgroundcolor="black"),
+                bgcolor="black"
+            ),
+            margin=dict(r=0, l=0, b=0, t=0),
+            paper_bgcolor="black",
+            height=350
+        )
+        return fig
+    except Exception as e:
+        st.warning(f"🔺 雲點模擬生成失敗: {str(e)}")
+        return None
+
 # ============================================================================== #
 # 🎨 核心主網頁前端 UI 渲染
 # ============================================================================== #
@@ -83,27 +130,38 @@ with tab1:
                 faces_count = 0
                 bounding_box_str = "無法計算"
                 area_val, volume_val = 0.0, 0.0
+                current_mesh = None # 用於本機生成點雲模擬
                 
                 if file_extension in [".obj", ".stl", ".glb"]:
                     try:
                         file_stream = io.BytesIO(file_bytes)
                         scene_or_mesh = trimesh.load(file_stream, file_type=file_extension.strip('.'))
                         if isinstance(scene_or_mesh, trimesh.Scene):
-                            mesh = list(scene_or_mesh.geometry.values())[0] if len(scene_or_mesh.geometry) > 0 else None
+                            # 如果是 Scene，取第一個幾何體
+                            if len(scene_or_mesh.geometry) > 0:
+                                current_mesh = list(scene_or_mesh.geometry.values())[0]
+                                # Scene 需要手動應用變換矩陣才能得到正確的頂點位置
+                                for geometry in scene_or_mesh.geometry.values():
+                                    if geometry is not None and len(geometry.vertices) > 10:
+                                        # 簡單應用，在實際應用中可能需要更複雜的場景圖處理
+                                        # 這裡只處理單一網格的情況
+                                        pass
+                            else:
+                                current_mesh = None
                         else:
-                            mesh = scene_or_mesh
+                            current_mesh = scene_or_mesh
                             
-                        if mesh is not None:
-                            vertices_count = len(mesh.vertices)
-                            faces_count = len(mesh.faces)
-                            area_val = float(mesh.area)
-                            volume_val = float(mesh.volume) if mesh.is_volume else 0.0
-                            bbox = mesh.bounding_box.extents
+                        if current_mesh is not None:
+                            vertices_count = len(current_mesh.vertices)
+                            faces_count = len(current_mesh.faces)
+                            area_val = float(current_mesh.area)
+                            volume_val = float(current_mesh.volume) if current_mesh.is_volume else 0.0
+                            bbox = current_mesh.bounding_box.extents
                             bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
                     except Exception as mesh_err:
                         st.warning(f"⚠️ 幾何結構解析受限: {str(mesh_err)}")
 
-                # 將 3D 檔案編碼成 Base64 字串存入資料庫，供前端 3D 畫布隨時調用
+                # 將 3D 檔案編碼成 Base64 字串存入資料庫
                 base64_mesh = base64.b64encode(file_bytes).decode('utf-8')
 
                 with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
@@ -138,7 +196,7 @@ with tab1:
                         "surface_area": float(area_val),
                         "volume": float(volume_val),
                         "ai_diagnosis": diagnosis_text,
-                        "filesize": base64_mesh,  # 🛠️ 把編碼好的 3D 資料大文字塞進 filesize 欄位當作快取
+                        "filesize": base64_mesh,  # 編碼好的 3D 資料大文字
                         "created_at": datetime.now().isoformat()
                     }
                     
@@ -184,25 +242,73 @@ with tab1:
                     st.markdown(f"#### 📄 檔案: {item.get('filename', '未命名資產')}")
                     st.caption(f"🕒 上傳時間: {display_time}")
                     
-                    # 🛸 核心：3D 實體動態雲點畫布渲染核心
                     mesh_b64 = item.get("filesize", "")
                     if mesh_b64 and len(mesh_b64) > 100:
-                        try:
-                            # 建立前端 HTML5 網格渲染視窗
-                            html_canvas = f"""
-                            <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-                            <model-viewer 
-                                src="data:model/gltf-binary;base64,{mesh_b64}" 
-                                alt="OptiSpin 3D Scan" 
-                                auto-rotate 
-                                camera-controls 
-                                background-color="#111111"
-                                style="width: 100%; height: 280px; background-color: #1a1a1a; border-radius: 10px;">
-                            </model-viewer>
-                            """
-                            st.components.v1.html(html_canvas, height=290)
-                        except Exception as canvas_err:
-                            st.caption("🔺 3D 畫布初始化受限")
+                        # 🛠️ 核心：3D 實體網格與雲點模擬雙模式切換核心
+                        # 使用 Session State 來記住每個項目的選擇模式
+                        mode_key = f"mode_{item.get('id')}"
+                        if mode_key not in st.session_state:
+                            st.session_state[mode_key] = "🛰️ 3D 模型實體"
+                            
+                        # 切換按鈕
+                        st.radio(
+                            "檢視模式",
+                            ["🛰️ 3D 模型實體", "模擬單色點雲"],
+                            key=mode_key,
+                            horizontal=True,
+                            label_visibility="collapsed"
+                        )
+                        
+                        if st.session_state[mode_key] == "🛰️ 3D 模型實體":
+                            # A. 渲染標準 3D 實體模型
+                            try:
+                                html_canvas = f"""
+                                <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+                                <model-viewer 
+                                    src="data:model/gltf-binary;base64,{mesh_b64}" 
+                                    alt="OptiSpin 3D Scan" 
+                                    auto-rotate 
+                                    camera-controls 
+                                    background-color="#111111"
+                                    style="width: 100%; height: 350px; background-color: #1a1a1a; border-radius: 10px;">
+                                </model-viewer>
+                                """
+                                st.components.v1.html(html_canvas, height=360)
+                            except Exception:
+                                st.caption("🔺 3D 畫布初始化受限")
+                        else:
+                            # B. 渲染模擬單色點雲圖
+                            with st.spinner("🌌 正在從網格中逆向封裝單色點雲模擬..."):
+                                # 在前端重新從 Base64 解碼出網格，並生成 Plotly 點雲圖
+                                # 注意：這會消耗手機前端效能
+                                try:
+                                    # 1. 解碼
+                                    file_bytes_rec = base64.b64decode(mesh_b64)
+                                    file_stream_rec = io.BytesIO(file_bytes_rec)
+                                    # 因為我們知道原檔案格式（雖然這裡假設是 glb，但 trimesh 有時需要指定，有時不用）
+                                    # 這裡不指定格式，讓 trimesh 試圖自行識別
+                                    scene_or_mesh_rec = trimesh.load(file_stream_rec, file_type='glb')
+                                    
+                                    # 2. 提取網格
+                                    if isinstance(scene_or_mesh_rec, trimesh.Scene):
+                                        if len(scene_or_mesh_rec.geometry) > 0:
+                                            current_mesh_rec = list(scene_or_mesh_rec.geometry.values())[0]
+                                        else:
+                                            current_mesh_rec = None
+                                    else:
+                                        current_mesh_rec = scene_or_mesh_rec
+                                        
+                                    # 3. 生成圖表並顯示
+                                    if current_mesh_rec is not None:
+                                        pc_fig = create_point_cloud_simulation(current_mesh_rec)
+                                        if pc_fig is not None:
+                                            st.plotly_chart(pc_fig, use_container_width=True, config={'displayModeBar': False})
+                                        else:
+                                            st.caption("🔺 模型太輕，無法生成有效的點雲模擬")
+                                    else:
+                                        st.caption("🔺 網格數據逆向解析失敗，無法生成點雲")
+                                except Exception as err_rec:
+                                    st.caption(f"🔺 雲點模擬生成失敗: {str(err_rec)}")
                     
                     col1, col2 = st.columns(2)
                     with col1:
