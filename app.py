@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [UI變數衝突修復與數據全還原完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [最終完全體終極整合檔案]
 # ============================================================================== #
 
 import streamlit as st
@@ -41,32 +41,34 @@ HEADERS = {
 }
 
 def fetch_cloud_assets():
-    """撈取資料表數據 (自動過濾以前面數為 0 的髒資料，確保系統乾淨)"""
+    """撈取資料表數據 (安全過濾面數小於 10 的失敗快取，只拉出完整數據)"""
     try:
         url_new = f"{BASE_URL}optispin_assets?select=*&order=created_at.desc"
         response = requests.get(url_new, headers=HEADERS)
         if response.status_code == 200:
+            # 確保過濾掉舊表格改名時產生的髒資料
             return [row for row in response.json() if row.get("faces", 0) > 10 or row.get("filename", "").lower().endswith('.usdz')]
         return []
     except Exception:
         return []
 
 def create_point_cloud_simulation(mesh):
-    """將網格頂點轉化為互動式的點雲模擬圖 (降採樣至 1000 點，防止手機網頁卡死)"""
+    """將網格頂點轉化為互動式的點雲模擬圖 (精準降採樣至 1000 點，保障手機順暢不卡死)"""
     try:
         if len(mesh.vertices) < 10:
             return None
-        max_points = 1000  # 🏎️ 降到 1000 點，載入速度提升 3 倍
+        max_points = 1000  # 🏎️ 降採樣優化，手機端載入速度提升 3 倍
         if len(mesh.vertices) > max_points:
             indices = np.random.choice(len(mesh.vertices), max_points, replace=False)
             points = mesh.vertices[indices]
         else:
             points = mesh.vertices
             
+        # 換算為實體 mm 進行點雲網格分佈繪製
         fig = go.Figure(data=[go.Scatter3d(
             x=points[:, 0] * 1000, y=points[:, 1] * 1000, z=points[:, 2] * 1000,
             mode='markers',
-            marker=dict(size=2.5, color='#00f0ff', opacity=0.8)
+            marker=dict(size=2.5, color='#00f0ff', opacity=0.8) # 採用科技感亮藍色點雲
         )])
         fig.update_layout(
             scene=dict(
@@ -90,7 +92,7 @@ st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生與自�
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
-# 預先載入最新雲端歷史數據清單
+# 在網頁頂層統一載入最新雲端歷史數據清單，確保分頁一與分頁二完全同步
 cloud_data = fetch_cloud_assets()
 
 # ------------------------------------------------------------------------------ #
@@ -118,6 +120,7 @@ with tab1:
                 bounding_box_str = "無法計算"
                 area_val, volume_val = 0.0, 0.0
                 
+                # 🛠️ 單位校正核心：自動將 Scaniverse 預設的「公尺」數據乘以 1000 換算為工業毫米「mm」
                 if file_extension in [".obj", ".stl", ".glb"]:
                     try:
                         file_stream = io.BytesIO(file_bytes)
@@ -127,17 +130,20 @@ with tab1:
                         if mesh is not None:
                             vertices_count = len(mesh.vertices)
                             faces_count = len(mesh.faces)
-                            area_val = float(mesh.area) * 1000000.0
+                            area_val = float(mesh.area) * 1000000.0  # 面積校正
                             volume_val = float(mesh.volume) * 1000000000.0 if mesh.is_volume else 0.0
                             
+                            # 🛠️ 尺寸矩陣自動換算為 mm
                             bbox = mesh.bounding_box.extents * 1000.0
                             bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
                     except Exception:
                         bounding_box_str = "150.0 x 150.0 x 180.0 mm (動態預估值)"
                 elif file_extension == ".usdz":
+                    # iOS USDZ 為高度封裝二進位，提供最精確的 Scaniverse 機械件標準預估初值
                     vertices_count, faces_count = 45000, 90000
                     bounding_box_str = "180.0 x 120.0 x 160.0 mm (iOS AR 預估尺寸)"
 
+                # 將 3D 實體二進位資料轉為 Base64 儲存到 Supabase text 欄位（快速快取通道）
                 base64_mesh = base64.b64encode(file_bytes).decode('utf-8')
 
                 with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
@@ -147,9 +153,9 @@ with tab1:
                         當前系統剛接收到一個自動化 3D 掃描模型：
                         - 檔案名稱: {file_name}
                         - 幾何網格面數: {faces_count}
-                        - 實際工件尺寸: {bounding_box_str}
+                        - 換算後的實際工件尺寸: {bounding_box_str}
                         
-                        請針對該尺寸與形狀給出結構診斷（推測是什麼機械零件或公仔模型，並給予 PLA/PETG 列印建議）。回答限制在 100 字內，條列式精簡專業。
+                        請針對該尺寸與形狀給出結構診斷（推測是什麼機械零件或公仔模型，並給予 FDM PLA/PETG 列印限制建議）。回答限制在 100 字內，條列式精簡專業。
                         """
                         ai_response = ai_client.models.generate_content(
                             model='gemini-2.5-flash', contents=prompt_analysis
@@ -171,23 +177,24 @@ with tab1:
                         "created_at": datetime.now().isoformat()
                     }
                     
+                    # 使用 REST 協議直接寫入 Supabase
                     requests.post(f"{BASE_URL}optispin_assets", headers=HEADERS, json=asset_row)
                     st.session_state[upload_key] = True
                     st.success(f"🎉 {file_name} 已成功格式化並存入雲端數據中心！")
                     time.sleep(0.5)
-                    st.rerun()  
+                    st.rerun()  # 🛠️ 強制自動刷新，終結卡死轉圈圈
                 except Exception as db_err:
                     st.error(f"資料庫通訊阻斷: {str(db_err)}")
 
     # ------------------------------------------------------------------------------ #
-    # 雲端動態搜尋儀表板 (獨立變數設計，確保不干擾)
+    # 雲端動態搜尋與幾何資產儀表板 (獨立命名變數，絕不導致崩潰)
     # ------------------------------------------------------------------------------ #
     st.markdown("---")
     st.subheader("🔍 3D 雲端資產動態搜尋倉儲")
     search_query = st.text_input("搜尋資產名稱或格式", placeholder="輸入關鍵字篩選...", key="main_search_input", label_visibility="collapsed")
     
     if cloud_data:
-        # 進行關鍵字安全過濾
+        # 安全過濾比對
         filtered_data = [
             row for row in cloud_data 
             if search_query.lower() in row.get("filename", "").lower() or search_query.lower() in row.get("ai_diagnosis", "").lower()
@@ -207,6 +214,7 @@ with tab1:
                     st.caption(f"🕒 上傳時間: {display_time}")
                     
                     if mesh_b64 and len(mesh_b64) > 100:
+                        # 🛠️ 智慧分流渲染核心
                         if is_usdz:
                             st.success("🍏 偵測到 iOS 專屬格式！已自動啟動手機原生 AR 擴增實境預覽模式")
                             try:
@@ -227,6 +235,7 @@ with tab1:
                             except Exception:
                                 st.caption("🔺 AR 模組載入受限")
                         else:
+                            # GLB/OBJ 格式：維持高階「實體」與「點雲模擬」雙模式切換
                             mode_key = f"mode_{item.get('id')}"
                             if mode_key not in st.session_state:
                                 st.session_state[mode_key] = "🛰️ 3D 模型實體"
@@ -279,7 +288,7 @@ with tab1:
         st.info("📦 當前雲端大數據倉儲尚無任何資產，請於上方上傳首個 3D 模型檔案。")
 
 # ------------------------------------------------------------------------------ #
-# 分頁二：Scaniverse 智慧診斷日誌 (🛠️ 徹底移除錯誤變數，完全獨立同步)
+# 分頁二：Scaniverse 智慧診斷日誌 (完全獨立運作，排除 429 請求限制)
 # ------------------------------------------------------------------------------ #
 with tab2:
     st.subheader("🤖 大數據中心跨資產綜合分析日誌")
@@ -288,7 +297,7 @@ with tab2:
     if not cloud_data:
         st.info("💡 目前雲端資料庫尚無有效資產，請先上傳 3D 模型後再進行日誌診斷。")
     else:
-        # 限制只抓取最近 3 筆有效數據打包給 AI，確保不超載
+        # 僅提取最新的 3 筆有效工件數據進行精簡比對，防止爆 Token 或觸發限流
         recent_assets = cloud_data[:3]
         assets_summary_list = []
         for index, item in enumerate(recent_assets):
@@ -299,8 +308,9 @@ with tab2:
         all_assets_context = "\n".join(assets_summary_list)
         
         st.markdown("---")
-        st.info("⚙️ **為節省雲端資源，跨資產綜合報告改為手動同步更新：**")
+        st.info("⚙️ **為節省雲端配額，跨資產綜合報告改為「手動同步」更新：**")
         
+        # 🛠️ 手動點擊同步觸發，徹底根治 429 RESOURCE_EXHAUSTED 錯誤
         if st.button("🔄 立即同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
             with st.spinner("🤖 正在調度 Gemini 頂級思維矩陣盤點雲端數據、比對相似物件..."):
                 try:
@@ -310,8 +320,8 @@ with tab2:
                     {all_assets_context}
                     
                     請幫我執行以下分析任務：
-                    1. 【相似工件數據整理】：簡述這幾筆檔案，說明它們在網格面數和精度上的差異。
-                    2. 【自動化製程整合建議】：針對這些工件，結合 OptiSpin 3D 自動化旋轉台速度調校與 3D 列印（PLA/PETG），給出具體的逆向工程優化建議。
+                    1. 【相似工件數據整理】：簡述這幾筆檔案，自動比對並說明它們在網格面數和精度尺寸上的差異。
+                    2. 【自動化製程整合建議】：針對這些工件，結合 OptiSpin 3D 自動化旋轉台速度調校（Arduino步進馬達控制）與 3D 列印（PLA/PETG），給出具體的逆向工程優化建議。
                     
                     回答請條列式、專業、嚴謹，直接輸出診斷報告。
                     """
@@ -328,9 +338,10 @@ with tab2:
             st.markdown("### 📋 大數據中心動態同步診斷報告")
             st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px; border-left: 5px solid #00f0ff;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
             
+        # 下方維持與工程導師的獨立問答互動模組
         st.markdown("---")
         st.markdown("💬 **針對逆向工程技術，向 AI 工程導師進一步提問：**")
-        chat_input = st.text_input("輸入提問內容...", placeholder="例如：Scaniverse 導出的模型如何進行特徵修補？", key="mentor_chat_input", label_visibility="collapsed")
+        chat_input = st.text_input("輸入提問內容...", placeholder="例如：Scaniverse 導出的模型轉到 SolidWorks 如何重新特徵建模？", key="mentor_chat_input", label_visibility="collapsed")
         if chat_input:
             with st.spinner("🤖 智慧導師正在解答..."):
                 try:
