@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [最高權限工業 Storage + 實體防呆鈕完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [最高權限工業 Storage + 全自動即時流道完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -81,7 +81,10 @@ def upload_to_supabase_storage(file_name, file_bytes):
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     unique_filename = f"{timestamp_prefix}_{file_name}"
     
+    upload_url = f"https://{PROJECT_REF}.co/storage/v1/object/models/{unique_filename}"
+    # 修正可能因為環境簡寫遺漏的完整網址連結
     upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
+    
     storage_headers = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
@@ -117,14 +120,13 @@ with tab1:
         "支援工業幾何格式 (GLB/USDZ/OBJ/STL)", type=["glb", "obj", "usdz", "stl"], label_visibility="collapsed"
     )
     
+    # 🚀 直接進行原生自動觸發，捨棄任何不穩定的手機端按鈕邏輯！
     if uploaded_file is not None:
-        st.info(f"📦 檔案已就緒：{uploaded_file.name} ({uploaded_file.size/1024/1024:.2f} MB)")
+        upload_key = f"active_upload_{uploaded_file.name}_{uploaded_file.size}"
         
-        # 🛠️ 實體防呆同步按鈕：強制打破手機瀏覽器輸入法與網路訊號的凍結鎖
-        if st.button("🚀 點擊確認：啟動雲端大數據同步", type="primary", use_container_width=True, key="force_upload_trigger_btn"):
-            upload_key = f"processed_{uploaded_file.name}_{uploaded_file.size}"
-            
-            with st.spinner("🚀 正在進行幾何拓撲解析與工業尺寸校正..."):
+        if upload_key not in st.session_state:
+            # 使用獨立動態狀態容器，強行在最上方展示即時進度
+            with st.status("🛸 雲端數位雙生同步中...", expanded=True) as status:
                 try:
                     file_bytes = uploaded_file.read()
                     file_name = uploaded_file.name
@@ -134,6 +136,7 @@ with tab1:
                     bounding_box_str = "150.0 x 150.0 x 150.0 mm"
                     area_val, volume_val = 0.0, 0.0
                     
+                    st.write("📐 正在讀取工件幾何拓撲與計算封絡體尺寸...")
                     if file_extension in [".obj", ".stl", ".glb"]:
                         try:
                             file_stream = io.BytesIO(file_bytes)
@@ -150,35 +153,50 @@ with tab1:
                     elif file_extension == ".usdz":
                         vertices_count, faces_count = 45000, 90000
                         bounding_box_str = "180.0 x 120.0 x 160.0 mm (iOS AR 預估尺寸)"
-                except Exception as ex_init:
-                    st.error(f"❌ 幾何分析失敗: {str(ex_init)}")
+                    
+                    st.write("📦 正在將 3D 圖檔高速分流至雲端儲存桶 (Storage)...")
+                    model_url = upload_to_supabase_storage(file_name, file_bytes)
+                    
+                    if not model_url:
+                        st.error("❌ 儲存桶寫入失敗！請確認 models 儲存桶的 Policy 已儲存放行。")
+                        st.stop()
+                        
+                    st.write("🤖 正在調度 Gemini 專家系統進行生成式工藝評估...")
+                    try:
+                        prompt_analysis = f"你是一位精通 3D 列印與精密加工的專家。工件檔名 {file_name}，網格面數 {faces_count}，換算尺寸 {bounding_box_str}。請給予 100 字內 FDM PLA/PETG 列印建議。"
+                        ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
+                        diagnosis_text = ai_response.text
+                    except Exception:
+                        diagnosis_text = "工件收錄成功。"
+                        
+                    st.write("💾 正在將中繼元數據寫入雲端關聯式資料庫...")
+                    asset_row = {
+                        "filename": file_name, 
+                        "vertices": int(vertices_count), 
+                        "faces": int(faces_count),
+                        "bounding_box": bounding_box_str, 
+                        "surface_area": float(area_val), 
+                        "volume": float(volume_val),
+                        "ai_diagnosis": diagnosis_text, 
+                        "filesize": model_url, 
+                        "timestamp": datetime.now().isoformat() 
+                    }
+                    
+                    res_db = requests.post(f"{BASE_URL}optispin_assets", headers=HEADERS, json=asset_row, timeout=15)
+                    
+                    if res_db.status_code in [200, 201]:
+                        st.session_state[upload_key] = True
+                        status.update(label="🎉 雲端資產同步大功告成！", state="complete", expanded=False)
+                        st.success(f"🎉 {file_name} 已成功格式化並存入雲端中心！")
+                        time.sleep(1.0)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ 資料庫寫入被彈回，狀態碼: {res_db.status_code} | 請確認資料表 Policy 的 WITH CHECK 是寫 true。")
+                        st.stop()
+                        
+                except Exception as ex_main:
+                    st.error(f"❌ 系統流程發生異常中斷: {str(ex_main)}")
                     st.stop()
-
-            with st.spinner("📦 正在將 3D 圖檔高速分流至雲端儲存桶 (Storage)..."):
-                model_url = upload_to_supabase_storage(file_name, file_bytes)
-                if not model_url:
-                    st.error("❌ 儲存桶寫入失敗！請確認 Supabase 中已建立 models 儲存桶並開通 Policy。")
-                    st.stop()
-
-            with st.spinner("🤖 正在調度 Gemini 專家系統進行生成式工藝評估..."):
-                try:
-                    prompt_analysis = f"你是一位精通 3D 列印與精密加工的專家。工件檔名 {file_name}，網格面數 {faces_count}，換算尺寸 {bounding_box_str}。請給予 100 字內 FDM PLA/PETG 列印建議。"
-                    ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
-                    diagnosis_text = ai_response.text
-                except Exception:
-                    diagnosis_text = "工件收錄成功。"
-
-            try:
-                asset_row = {
-                    "filename": file_name, "vertices": int(vertices_count), "faces": int(faces_count),
-                    "bounding_box": bounding_box_str, "surface_area": float(area_val), "volume": float(volume_val),
-                    "ai_diagnosis": diagnosis_text, "filesize": model_url, "timestamp": datetime.now().isoformat() 
-                }
-                requests.post(f"{BASE_URL}optispin_assets", headers=HEADERS, json=asset_row, timeout=15)
-                st.success(f"🎉 {file_name} 已成功格式化並存入雲端中心！")
-                time.sleep(0.5)
-                st.rerun()  
-            except Exception: pass
 
     # ------------------------------------------------------------------------------ #
     # 🔍 3D 雲端資產搜尋儀表板 (極速、不超時、按鈕下方原地嵌入、支援狀態快取)
@@ -202,7 +220,7 @@ with tab1:
                     st.markdown(f"#### 📄 檔案: {fname}")
                     st.caption(f"🕒 上傳時間: {str(item.get('timestamp', ''))[:16].replace('T', ' ')}")
                     
-                    # 🛠 *所見即所得「內嵌畫布容器槽」，完美卡在數據與按鈕的正中間！*
+                    # 🛠 所見即所得「內嵌畫布容器槽」，完美卡在數據與按鈕的正中間！
                     canvas_slot = st.container()
                     
                     col1, col2 = st.columns(2)
@@ -239,10 +257,8 @@ with tab1:
 
                     # 🛠️ 記憶層快取渲染核心
                     with canvas_slot:
-                        # 1. 實體全貼圖預覽被打開
                         if st.session_state.get(mesh_toggle_key, False):
                             if is_usdz:
-                                # 🍏 iOS 原生高權限 AR 投放通路：跨越沙盒限制，秒開 iPhone 相機
                                 st.success("🍏 iOS 原生 AR 靜態網址通路已就緒！")
                                 st.link_button(
                                     "📱 點擊此處 → 立即啟動 iPhone 官方空間 AR 投放",
@@ -252,7 +268,6 @@ with tab1:
                                 )
                                 st.caption("<div style='text-align:center; color:#888; font-size:11px;'>直連技術：點擊後瀏覽器會瞬間喚醒蘋果原廠 3D 快照鏡頭</div>", unsafe_allow_html=True)
                             else:
-                                # 🛰️ GLB 通用格式穩定版：從儲存桶網址直接極速串流
                                 html_canvas = f"""
                                 <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
                                 <model-viewer 
@@ -263,19 +278,17 @@ with tab1:
                                 """
                                 st.components.v1.html(html_canvas, height=330)
 
-                        # 2. 高科技點雲預覽被打開
                         if st.session_state.get(pc_toggle_key, False):
                             if is_usdz:
                                 st.warning("🌌 點雲模擬目前專屬於工業 GLB 格式，USDZ 請直接啟用「實體全貼圖預覽」投放 AR！")
                             else:
                                 with st.spinner("🌌 正在從儲存桶逆向還原高科技點雲..."):
                                     try:
-                                        # 從雲端儲存桶高速下載二進位數據並用 trimesh 進行輕量點雲抽樣
                                         res_file = requests.get(file_url, timeout=15)
                                         scene_or_m = trimesh.load(io.BytesIO(res_file.content), file_type='glb')
                                         c_mesh = list(scene_or_m.geometry.values())[0] if isinstance(scene_or_m, trimesh.Scene) else scene_or_m
                                         
-                                        max_points = 1500  # 架構升級後，點雲精度可以提高 1.5 倍而不卡頓
+                                        max_points = 1500  
                                         indices = np.random.choice(len(c_mesh.vertices), min(len(c_mesh.vertices), max_points), replace=False)
                                         pts = c_mesh.vertices[indices] * 1000.0
                                         
