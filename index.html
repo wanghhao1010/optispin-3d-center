@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛸 3D 掃描整合控制網頁系統</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-color: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary-blue: #38bdf8;
+            --btn-start: #10b981;
+            --btn-stop: #ef4444;
+            --accent-orange: #f97316;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* 介面外殼 */
+        .app-container {
+            width: 100%;
+            max-width: 460px;
+            background-color: var(--card-color);
+            border-radius: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+            padding: 25px;
+            box-sizing: border-box;
+            border: 1px solid #334155;
+        }
+
+        .app-header { text-align: center; margin-bottom: 20px; }
+        .app-header h1 { font-size: 24px; margin: 0 0 5px 0; color: var(--primary-blue); }
+        .app-header p { font-size: 13px; color: var(--text-muted); margin: 0; }
+
+        .section-title {
+            font-size: 15px;
+            font-weight: bold;
+            color: var(--primary-blue);
+            margin: 15px 0 10px 0;
+            border-left: 3px solid var(--primary-blue);
+            padding-left: 8px;
+        }
+
+        .control-group { margin-bottom: 12px; }
+        .control-group label { display: block; font-size: 13px; margin-bottom: 6px; }
+
+        input[type="text"], input[type="number"], select {
+            width: 100%; padding: 10px 14px; background-color: #0f172a;
+            border: 1px solid #475569; border-radius: 10px; color: white;
+            font-size: 14px; box-sizing: border-box; outline: none;
+        }
+        input:focus, select:focus { border-color: var(--primary-blue); }
+
+        .row { display: flex; gap: 10px; }
+        .row .control-group { flex: 1; }
+
+        /* 按鈕樣式 */
+        .btn {
+            width: 100%; padding: 12px; border: none; border-radius: 12px;
+            font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s;
+            margin-bottom: 8px; color: white;
+        }
+        .btn:active { transform: scale(0.98); }
+        .btn-connect { background-color: #3b82f6; }
+        .btn-run { background-color: var(--btn-start); }
+        .btn-stop { background-color: var(--btn-stop); }
+        .btn-download { background-color: var(--accent-orange); }
+
+        /* 3D 渲染視窗 */
+        .threed-container {
+            width: 100%; height: 280px; background-color: #000;
+            border-radius: 14px; margin-top: 10px; overflow: hidden;
+            border: 1px solid #334155;
+        }
+        iframe { width: 100%; height: 100%; border: none; }
+
+        /* 歷史檔案清單區 */
+        .history-list {
+            background-color: #0f172a; border-radius: 12px;
+            max-height: 120px; overflow-y: auto; padding: 5px;
+            border: 1px solid #334155; margin-top: 5px;
+        }
+        .history-item {
+            padding: 8px 12px; border-radius: 8px; margin-bottom: 5px;
+            background-color: #1e293b; font-size: 13px; cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: 0.1s;
+        }
+        .history-item:hover { background-color: #334155; }
+        .delete-btn {
+            color: #ef4444; border: none; background: none; 
+            font-weight: bold; cursor: pointer; padding: 0 5px;
+        }
+
+        .status-bar {
+            background-color: #0f172a; padding: 10px; border-radius: 8px;
+            font-size: 12px; color: var(--text-muted); text-align: center;
+            margin-top: 15px; border: 1px dashed #334155;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <div class="app-header">
+            <h1>🛸 3D SCANNER APP</h1>
+            <p>控制、雲端同步與 3D 可視化系統</p>
+        </div>
+
+        <div class="section-title">🕹️ 1. 旋轉盤硬體控制</div>
+        <div class="control-group">
+            <select id="portSelect">
+                <option>COM3 (WeMos D1)</option>
+                <option>COM4</option>
+            </select>
+        </div>
+        <button class="btn btn-connect" onclick="updateStatus('🟢 已成功發送連線請求')">連線到旋轉盤</button>
+        <div class="row">
+            <div class="control-group"><label>🔄 圈數</label><input type="number" id="revs" value="1.0" step="0.1"></div>
+            <div class="control-group"><label>⚡ 速度</label><input type="number" id="speed" value="600"></div>
+        </div>
+        <div class="row">
+            <button class="btn btn-run" onclick="updateStatus('🟡 正在旋轉中...')">▶ 啟動旋轉</button>
+            <button class="btn btn-stop" onclick="updateStatus('🔴 已緊急停止！')">🛑 停止</button>
+        </div>
+
+        <div class="section-title">🌐 2. 雲端 3D 圖檔下載與本地儲存</div>
+        <div class="control-group">
+            <input type="text" id="modelUrl" value="https://files.testfile.org/3d/TEST_3D_FILE.stl" placeholder="請輸入 .stl 或 .obj 圖檔網址">
+        </div>
+        <button class="btn btn-download" onclick="handleDownload()">📥 下載並儲存此模型</button>
+
+        <div class="control-group" style="margin-top: 10px;">
+            <label style="color: var(--text-muted); font-weight: bold;">📁 歷史已載入檔案列表 (點擊可切換觀看)：</label>
+            <div class="history-list" id="historyContainer">
+                </div>
+        </div>
+
+        <div class="section-title">📊 3. 3D 模型即時展示 (可滑動旋轉)</div>
+        <div class="threed-container">
+            <iframe id="threedViewer" src="https://3dviewer.net/"></iframe>
+        </div>
+
+        <div class="status-bar" id="statusBar">系統狀態：待命</div>
+    </div>
+
+    <script>
+        // 網頁一打開，立刻載入歷史儲存紀錄
+        document.addEventListener('DOMContentLoaded', () => {
+            loadHistory();
+        });
+
+        // 狀態列更新
+        function updateStatus(msg) {
+            document.getElementById('statusBar').innerText = `系統狀態：${msg}`;
+        }
+
+        // 處理下載、儲存與渲染
+        function handleDownload() {
+            const url = document.getElementById('modelUrl').value.trim();
+            if (!url) {
+                alert('請輸入有效的網址！');
+                return;
+            }
+
+            updateStatus('⏳ 正在從雲端擷取 3D 檔案資訊...');
+
+            // 擷取檔名
+            let filename = url.split('/').pop();
+            if (!filename || (!filename.includes('.stl') && !filename.includes('.obj'))) {
+                filename = "scanned_model_" + Date.now().toString().slice(-4) + ".stl";
+            }
+
+            // 1. 將資料儲存到 LocalStorage (瀏覽器資料庫)
+            saveToStorage(filename, url);
+
+            // 2. 刷新歷史清單
+            loadHistory();
+
+            // 3. 送去 3D 引擎展示
+            render3D(url);
+            updateStatus(`✅ 成功載入並儲存模型：${filename}`);
+        }
+
+        // 啟動 3D 渲染引擎
+        function render3D(url) {
+            const viewer = document.getElementById('threedViewer');
+            // 利用 3dviewer.net 的開源 API 傳入 URL，達成純網頁 3D 互動展示
+            viewer.src = `https://3dviewer.net/#url=${url}`;
+        }
+
+        // 儲存資料到瀏覽器本地硬碟
+        function saveToStorage(name, url) {
+            let history = JSON.parse(localStorage.getItem('scan_history')) || [];
+            
+            // 避免重複儲存相同的網址
+            if (!history.some(item => item.url === url)) {
+                history.unshift({ name: name, url: url }); // 新檔案排在最前面
+                localStorage.setItem('scan_history', JSON.stringify(history));
+            }
+        }
+
+        // 讀取並顯示歷史清單
+        function loadHistory() {
+            const container = document.getElementById('historyContainer');
+            const history = JSON.parse(localStorage.getItem('scan_history')) || [];
+            
+            if (history.length === 0) {
+                container.innerHTML = '<div style="color:#64748b; text-align:center; padding:20px; font-size:12px;">尚無下載儲存紀錄</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            history.forEach((item, index) => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'history-item';
+                // 點擊項目就能重新觀看
+                itemDiv.onclick = () => {
+                    render3D(item.url);
+                    document.getElementById('modelUrl').value = item.url;
+                    updateStatus(`🔄 切換觀看歷史檔案：${item.name}`);
+                };
+
+                itemDiv.innerHTML = `
+                    <span>📄 ${item.name}</span>
+                    <button class="delete-btn" onclick="deleteHistory(event, ${index})">×</button>
+                `;
+                container.appendChild(itemDiv);
+            });
+        }
+
+        // 刪除某一筆歷史紀錄
+        function deleteHistory(event, index) {
+            event.stopPropagation(); // 防止觸發點擊載入事件
+            let history = JSON.parse(localStorage.getItem('scan_history')) || [];
+            history.splice(index, 1);
+            localStorage.setItem('scan_history', JSON.stringify(history));
+            loadHistory();
+            updateStatus('🗑️ 已刪除該筆檔案紀錄');
+        }
+    </script>
+</body>
+</html>

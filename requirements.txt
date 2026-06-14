@@ -1,0 +1,7 @@
+streamlit>=1.35.0
+numpy>=1.23.0
+trimesh[easy]>=4.0.0
+matplotlib>=3.7.0
+plotly>=5.15.0
+supabase>=2.4.0
+google-genai>=0.1.1
