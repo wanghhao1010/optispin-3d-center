@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [iOS 原生預覽檢視・大圓滿完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [台灣時區校正 + 純HTTP原生Gemini完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -10,8 +10,7 @@ import time
 import io
 import requests  
 import plotly.graph_objects as go
-from datetime import datetime
-from google import genai
+from datetime import datetime, timedelta  # 🎯 引入時區微調核心
 
 # 1. 系統網頁頂層基礎配置
 st.set_page_config(
@@ -29,7 +28,6 @@ TABLE_NAME = "optispin_assets"
 try:
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    ai_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception:
     st.error("❌ Secrets 設定缺失！請確認配置。")
     st.stop()
@@ -41,7 +39,7 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 核心流道：精準對齊真實欄位拼字，無限大通車"""
+    """🚀 讀取端流道：精準欄位對齊"""
     try:
         fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_diagnosis"
         url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc"
@@ -65,10 +63,19 @@ def fetch_lightweight_assets():
             else:
                 final_url = db_file_str
                 
+            # 🕒 解析時間戳記並做防呆處理
+            raw_ts = row.get("timestamp", "")
+            if raw_ts:
+                # 拿掉可能干擾的時區後綴，保留前 16 碼 (YYYY-MM-DD HH:MM)
+                ts_str = str(raw_ts)[:16].replace("T", " ")
+            else:
+                # 萬一沒有時間，現場抓取最新的台灣時間當作預設
+                ts_str = (datetime.utcnow() + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
+
             safe_row = {
                 "id": row.get("id", 0),
                 "filename": row.get("filename") if row.get("filename") else "未命名 3D 資產",
-                "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else "2026-06-14 00:00",
+                "timestamp": ts_str,
                 "vertices": 45000,  
                 "faces": 90000,
                 "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
@@ -81,7 +88,7 @@ def fetch_lightweight_assets():
         return []
 
 def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶極速發射器"""
+    """📦 儲存桶發射器"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     clean_name = file_name.replace(" ", "_")
     unique_filename = f"{timestamp_prefix}_{clean_name}"
@@ -100,8 +107,28 @@ def upload_to_supabase_storage(file_name, file_bytes):
     except Exception:
         return ""
 
+def ask_gemini_via_http(prompt_text):
+    """🧠 【原生 REST API 絕殺通道】：完全不使用外部庫，直接走純 HTTP 請求爆破 Gemini 核心！"""
+    # 使用當前公認相容性最強、最穩定的 Flash 節點
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt_text}]
+        }]
+    }
+    headers = {"Content-Type": "application/json"}
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=15)
+        if res.status_code == 200:
+            res_json = res.json()
+            return res_json['candidates'][0]['content']['parts'][0]['text'].strip()
+        else:
+            return f"精密工件數位雙生收錄成功。［提示：官方端吐回狀態碼 {res.status_code}］"
+    except Exception as e:
+        return f"精密工件數位雙生收錄成功。［提示：REST 通訊中斷 {str(e)[:20]}］"
+
 # ============================================================================== #
-# 🎨 前端 UI 渲染
+# 🎨 核心主網頁前端 UI 渲染 (分頁打包體)
 # ============================================================================== #
 
 st.title("🛸 OptiSpin 3D 控制中心")
@@ -160,18 +187,18 @@ with tab1:
                     st.session_state["upload_triggered"] = False
                     st.stop()
 
-                status.write("🤖 正在調度 Gemini 專家系統生成生成式工藝報告...")
-                try:
-                    prompt_analysis = f"工件檔名 {file_name}，請給予 100 字內 FDM PLA/PETG 列印速度建議與馬達調校。"
-                    ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
-                    diagnosis_text = ai_response.text
-                except Exception: 
-                    diagnosis_text = "精密工件數位雙生收錄成功。"
+                # 🎯 【核心大覺醒】：直接用純原生 HTTP 發送請求，跳過所有安裝套件，100% 逼出分析！
+                status.write("🤖 正在調度 Gemini 專家系統生成精準工藝報告...")
+                intelligence_prompt = f"你是一位精密系統設計的逆向工程專家。工件檔名為 {file_name}，包絡體邊界尺寸為 {bounding_box_str}。請在 120 字內針對此工件給予 FDM 3D列印層高、列印速度建議，並給予 Arduino 自動化旋轉轉盤馬達轉速的具體參數調校。"
+                diagnosis_text = ask_gemini_via_http(intelligence_prompt)
 
                 status.write("💾 正在向資料表登錄核心資產數據...")
+                # 🎯 【台北時區強行對齊】：不管伺服器在哪個國家，強行用世界協調時(UTC)加 8 小時算出精準的台灣現場上傳時間！
+                taiwan_now = (datetime.utcnow() + timedelta(hours=8)).isoformat()
+                
                 asset_row = {
                     "filename": file_name, 
-                    "timestamp": datetime.now().isoformat(),
+                    "timestamp": taiwan_now,  # 寫入校正後的台灣時間
                     "filesize": model_url,          
                     "file_path": file_name,
                     "dimensions": bounding_box_str,  
@@ -213,7 +240,7 @@ with tab1:
                     is_usdz = str(fname).lower().endswith('.usdz')
                     
                     st.markdown(f"#### 📄 檔案: {fname}")
-                    st.caption(f"🕒 上傳時間: {item.get('timestamp')}")
+                    st.caption(f"🕒 上傳時間 (台北時間): {item.get('timestamp')}")
                     
                     canvas_slot = st.container()
                     col1, col2 = st.columns(2)
@@ -250,17 +277,14 @@ with tab1:
                             time.sleep(0.5)
                             st.rerun()
 
-                    # 🎯 格式分流預覽展開區
                     with canvas_slot:
                         if st.session_state.get(mesh_toggle_key, False) and file_url:
                             if is_usdz:
                                 st.success("🍏 蘋果原廠 AR 快速檢視通道已啟動！")
-                                # 💡 【破關關鍵】：利用 <a> 標籤內嵌一張高科技按鈕圖示，並加上 rel="ar"
-                                # 這樣點擊時，iPhone 就會完全跳過下載視窗，一秒拉開 3D 實體相機預覽檢視！
                                 html_ar_code = f"""
                                 <a href="{file_url}" rel="ar" style="text-decoration: none;">
-                                    <img src="https://developer.apple.com/assets/elements/icons/augmented-reality/augmented-reality-64x64.png" style="width:36px; vertical-align:middle; margin-right:10px;">
-                                    <span style="background-color: #ff4b4b; color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 15px; box-shadow: 0px 4px 10px rgba(0,0,0,0.25); display: inline-block; vertical-align: middle;">
+                                    <img src="https://developer.apple.com/assets/elements/icons/augmented-reality/augmented-reality-64x64.png" style="width:32px; vertical-align:middle; margin-right:10px;">
+                                    <span style="background-color: #ff4b4b; color: white; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0px 4px 10px rgba(0,0,0,0.25); display: inline-block; vertical-align: middle;">
                                         📱 點擊此處 → 立即進入 3D 實體原生空間檢視
                                     </span>
                                 </a>
@@ -304,7 +328,7 @@ with tab1:
         st.info("📦 當前雲端大數據倉儲尚無任何資產，請於上方上傳模型檔案。")
 
 # ------------------------------------------------------------------------------ #
-# 分頁二：Scaniverse 智慧診斷日誌
+# 分頁二：Scaniverse 智慧診斷日誌 (【同步改為原生 HTTP】)
 # ------------------------------------------------------------------------------ #
 with tab2:
     st.subheader("🤖 大數據中心跨資產綜合分析日誌")
@@ -314,10 +338,8 @@ with tab2:
         all_assets_context = "\n".join(assets_summary_list)
         if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
             with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
-                try:
-                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
-                    response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[intelligence_prompt])
-                    st.session_state["cached_diagnostic_report"] = response.text
-                except Exception: st.error("🧠 雲端繁忙，請稍候再試。")
+                # 🎯 分頁二也同步降維打擊，直接走純網路請求爆破官方 API 獲取跨資產大數據報告！
+                intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢，給予大三專題口試時的亮點提問應對技巧，並針對製程自動化步進馬達調校與 FDM 速度給予 150 字內的深入分析報告：\n{all_assets_context}"
+                st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
         if "cached_diagnostic_report" in st.session_state:
             st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px; color:#ffffff;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
