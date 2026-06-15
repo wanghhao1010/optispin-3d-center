@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [專題實體 Banner 歸位・終極完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [物件正名 + 實體照空投・大圓滿功能完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -77,19 +77,20 @@ def fetch_lightweight_assets():
                 "faces": 90000,
                 "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
                 "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "工件數位雙生收錄成功。",
-                "filesize": final_url  
+                "filesize": final_url,
+                "photo_url": row.get("file_path", "")  # 🎯 將 file_path 欄位映射為實體照網址
             }
             clean_list.append(safe_row)
         return clean_list
     except Exception:
         return []
 
-def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶極速發射器"""
+def upload_to_supabase_storage(file_name, file_bytes, bucket="models"):
+    """📦 儲存桶極速發射器：支援 models 模型桶與 saved_images 照片桶雙分流"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     clean_name = file_name.replace(" ", "_")
     unique_filename = f"{timestamp_prefix}_{clean_name}"
-    upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
+    upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/{bucket}/{unique_filename}"
     
     storage_headers = {
         "apikey": SUPABASE_KEY,
@@ -99,35 +100,30 @@ def upload_to_supabase_storage(file_name, file_bytes):
     try:
         res = requests.post(upload_url, headers=storage_headers, data=file_bytes, timeout=30)
         if res.status_code in [200, 201]:
-            return f"{STORAGE_URL}{unique_filename}"
+            return f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/{bucket}/{unique_filename}"
         return ""
     except Exception:
         return ""
 
 def ask_gemini_via_http(prompt_text):
-    """🧠 【純 HTTP 絕殺通道】：全線升級至全球最新官方商業版 gemini-2.5-flash，徹底粉碎 404/500 封鎖！"""
+    """🧠 【純 HTTP 絕殺通道】：全面對齊正式版 gemini-2.5-flash"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt_text}]
-        }]
-    }
+    payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
     headers = {"Content-Type": "application/json"}
     try:
         res = requests.post(url, json=payload, headers=headers, timeout=15)
         if res.status_code == 200:
-            res_json = res.json()
-            return res_json['candidates'][0]['content']['parts'][0]['text'].strip()
+            return res.json()['candidates'][0]['content']['parts'][0]['text'].strip()
         else:
-            return f"精密工件數位雙生收錄成功。［官方提示：端點回應狀態碼 {res.status_code}］"
+            return f"精密工件數位雙生收錄成功。［官方提示狀態碼 {res.status_code}］"
     except Exception as e:
-        return f"精密工件數位雙生收錄成功。［網絡提示：通訊異常 {str(e)[:20]}］"
+        return f"精密工件數位雙生收錄成功。［通訊提示 {str(e)[:20]}］"
 
 # ============================================================================== #
-# 🎨 核心主網頁前端 UI 渲染 (高質感實體專題照片橫幅版)
+# 🎨 核心主網頁前端 UI 渲染
 # ============================================================================== #
 
-# 🎯 【專題視覺歸位】：已成功替換為你上傳的 OmniSpin 3D 轉盤實體掃描系統照片！
+# 專題實體 Banner 圖片頂部包裹
 banner_html = """
 <div style="width: 100%; overflow: hidden; border-radius: 12px; margin-bottom: -10px;">
     <img src="https://pwmijkkzufcqrnmodxap.supabase.co/storage/v1/object/public/saved_images/OmniSpin%203D%20Scanning%20System.png" 
@@ -136,7 +132,6 @@ banner_html = """
 """
 st.components.v1.html(banner_html, height=180)
 
-# 標題與學程資訊
 st.title("🛸 OptiSpin 3D 控制中心")
 st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生管理端")
 
@@ -158,7 +153,6 @@ with tab1:
 
     if uploaded_file is not None:
         st.info(f"📦 檔案已就緒：{uploaded_file.name} ({uploaded_file.size/1024/1024:.2f} MB)")
-        
         if st.button("🚀 點擊確認：啟動雲端大數據同步", type="primary", use_container_width=True, key="force_upload_trigger_btn"):
             st.session_state["upload_triggered"] = True
             st.rerun()
@@ -186,7 +180,7 @@ with tab1:
                     except Exception: pass
                 
                 status.write("📦 正在將實體圖檔空投至 Supabase Storage 儲存桶...")
-                model_url = upload_to_supabase_storage(file_name, file_bytes)
+                model_url = upload_to_supabase_storage(file_name, file_bytes, bucket="models")
                 
                 if not model_url:
                     st.error("❌ 儲存桶通道異常。")
@@ -198,14 +192,13 @@ with tab1:
                 diagnosis_text = ask_gemini_via_http(intelligence_prompt)
 
                 status.write("💾 正在向資料表登錄核心資產數據...")
-                # 🕒 台北時區精準對齊，防止伺服器在國外造成日期錯亂
                 taiwan_now = (datetime.utcnow() + timedelta(hours=8)).isoformat()
                 
                 asset_row = {
                     "filename": file_name, 
                     "timestamp": taiwan_now,  
                     "filesize": model_url,          
-                    "file_path": file_name,
+                    "file_path": "", # 初始實體炤空置
                     "dimensions": bounding_box_str,  
                     "ai_diagnosis": diagnosis_text 
                 }
@@ -224,14 +217,14 @@ with tab1:
                     st.stop()
                     
             except Exception as e:
-                st.error(f"❌ 流程異常中斷: {str(e)}")
+                st.error(f"❌ 流程異常中編: {str(e)}")
                 st.session_state["upload_triggered"] = False
                 st.stop()
 
-    # 🔍 3D 雲端資產搜尋倉儲展示區
+    # 🔍 3D 雲端資產動態搜尋展示區
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
-    st.subheader(f"🔍 3D 雲端資產動態搜尋倉儲 (目前雲端總計: {total_count} 筆)")
+    st.subheader(f"🔍 3D 雲端資產倉儲 (目前總計: {total_count} 筆)")
     search_query = st.text_input("搜尋資產名稱", placeholder="輸入關鍵字篩選...", key="main_search_input", label_visibility="collapsed")
     
     if cloud_data:
@@ -242,15 +235,47 @@ with tab1:
                     fname = item.get('filename')
                     asset_id = item.get('id')
                     file_url = item.get('filesize', '')
+                    current_photo = item.get('photo_url', '')
                     is_usdz = str(fname).lower().endswith('.usdz')
                     
-                    st.markdown(f"#### 📄 檔案: {fname}")
-                    st.caption(f"🕒 上傳時間 (台北時間): {item.get('timestamp')}")
+                    st.markdown(f"### 📄 資產名稱: **{fname}**")
+                    st.caption(f"🕒 上傳時間 (台北時間): {item.get('timestamp')} | 雲端編號 ID: {asset_id}")
                     
                     canvas_slot = st.container()
-                    col1, col2 = st.columns(2)
-                    with col1: st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
-                    with col2: st.metric("工業邊界包絡體 (Dimensions)", item.get('dimensions', '無法計算'))
+                    
+                    # 🪐 實體照與 3D 特徵左右分流排版
+                    photo_col, metric_col = st.columns([1, 1.2])
+                    with photo_col:
+                        if current_photo and str(current_photo).startswith("http"):
+                            st.image(current_photo, caption="📸 現場實體工件照片比對", use_container_width=True)
+                        else:
+                            st.warning("⚠️ 尚無實體拍照存證")
+                            # 📸 【功能一：現場拍照/附加相片功能】
+                            img_file = st.file_uploader("空投現場實體相片", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
+                            if img_file is not None:
+                                if st.button("📤 上傳相片", key=f"img_btn_{asset_id}", use_container_width=True):
+                                    with st.spinner("📦 正在空投相片至 saved_images 儲存桶..."):
+                                        p_url = upload_to_supabase_storage(img_file.name, img_file.read(), bucket="saved_images")
+                                        if p_url:
+                                            # 回填至資料庫的 file_path 欄位
+                                            requests.patch(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS, json={"file_path": p_url})
+                                            st.toast("📸 實體工件照同步成功！")
+                                            time.sleep(0.5)
+                                            st.rerun()
+
+                    with metric_col:
+                        st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
+                        st.metric("工業邊界包絡體 (Dimensions)", item.get('dimensions', '無法計算'))
+                        
+                        # 📝 【功能二：現場修改檔名功能】
+                        new_name = st.text_input("✏️ 修改資產正名", value=fname, key=f"edit_name_{asset_id}")
+                        if new_name != fname:
+                            if st.button("💾 確認更名", key=f"save_name_{asset_id}"):
+                                requests.patch(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS, json={"filename": new_name})
+                                st.toast("✏️ 資產名稱修訂成功！")
+                                time.sleep(0.5)
+                                st.rerun()
+
                     st.info(f"🤖 Gemini 智慧評估報告：\n{item.get('ai_report')}")
 
                     mesh_toggle_key = f"toggle_mesh_{asset_id}"
@@ -263,8 +288,6 @@ with tab1:
                                 st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
                                 st.session_state[pc_toggle_key] = False
                                 st.rerun()
-                        else:
-                            st.button("🔺 歷史唯慢資產", key=f"btn_m_{asset_id}", disabled=True, use_container_width=True)
                             
                     with view_col2:
                         if file_url and file_url.startswith("http"):
@@ -272,8 +295,6 @@ with tab1:
                                 st.session_state[pc_toggle_key] = not st.session_state.get(pc_toggle_key, False)
                                 st.session_state[mesh_toggle_key] = False
                                 st.rerun()
-                        else:
-                            st.button("🔺 無實體圖檔", key=f"btn_pc_{asset_id}", disabled=True, use_container_width=True)
 
                     with del_col:
                         if st.button(f"🗑️ 銷毀", key=f"del_{asset_id}", use_container_width=True):
