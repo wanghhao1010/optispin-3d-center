@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [雲端公網互通・一次到位終極完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [反璞歸真・雲端經典不消失終極大圓滿]
 # ============================================================================== #
 
 import streamlit as st
@@ -119,7 +119,7 @@ def upload_model_to_storage(file_name, file_bytes):
         return ""
 
 def ask_gemini_via_http(prompt_text):
-    """🧠 雲端智算通道：Gemini 2.5-Flash"""
+    """🧠 雲端智算唯一通道：Gemini 2.5-Flash"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
     headers = {"Content-Type": "application/json"}
@@ -127,28 +127,12 @@ def ask_gemini_via_http(prompt_text):
         res = requests.post(url, json=payload, headers=headers, timeout=15)
         if res.status_code == 200:
             return res.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-        return "精密收錄成功。"
+        return "精密工件數位雙生收錄成功。"
     except Exception:
-        return "精密收錄成功。"
-
-def ask_ollama_local(prompt_text, endpoint_url, model_name="gemma2:2b"):
-    """🤖 【邊緣智算通道】：支援穿透網址，讓網頁 100% 秀出 Ollama 成果！"""
-    # 🎯 自動修飾結尾斜線
-    base_url = endpoint_url.strip().rstrip('/')
-    full_url = f"{base_url}/api/generate"
-    payload = { "model": model_name, "prompt": prompt_text, "stream": False }
-    try:
-        res = requests.post(full_url, json=payload, timeout=15)
-        if res.status_code == 200:
-            return f"［🤖 本地邊緣算力模式 - {model_name}］\n" + res.json().get("response", "").strip()
-        return f"精密工件數位雙生收錄成功。［本地端點回應：{res.status_code}］"
-    except Exception as e:
-        # 🛡️ 萬用安全降級：如果隧道斷開，全自動由雲端 Gemini 承接，確保絕不當機
-        fallback = ask_gemini_via_http(prompt_text)
-        return f"［🛸 智慧雲端自動代打］\n" + fallback
+        return "精密工件數位雙生收錄成功。"
 
 # ============================================================================== #
-# 🎨 前端 UI 總量渲染
+# 🎨 前端 UI 經典流渲染
 # ============================================================================== #
 
 banner_html = """
@@ -161,19 +145,6 @@ st.components.v1.html(banner_html, height=180)
 
 st.title("🛸 OptiSpin 3D 控制中心")
 st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生管理端")
-
-# 🎯 【超強雙模 AI 控制面板】：加入公網內網穿透網址自定義輸入框
-with st.sidebar:
-    st.markdown("### 🧠 數位雙生智算核心控制")
-    ai_mode = st.radio("選擇生成式核心大腦", ["雲端超算 (Gemini 2.5)", "本地邊緣算力 (Ollama)"])
-    ollama_model = "gemma2:2b"
-    ollama_endpoint = "http://localhost:11434"
-    
-    if ai_mode == "本地邊緣算力 (Ollama)":
-        ollama_model = st.text_input("本機模型標籤", value="gemma2:2b")
-        # 🎯 這裡讓你在手機上可以直接把 localtunnel 網址貼進來，直接穿透回本機！
-        ollama_endpoint = st.text_input("Ollama 直通端點網址", value="http://localhost:11434", help="本機電腦展示可用 localhost，手機遠端展示請輸入 localtunnel 網址")
-        st.success("🤖 雙模血管配置完成！")
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
@@ -227,13 +198,9 @@ with tab1:
                     st.session_state["upload_triggered"] = False
                     st.stop()
 
-                status.write("🤖 正在調度生成式專家系統計算製程參數...")
+                status.write("🤖 正在調度全球最新 Gemini 2.5 專家系統生成精準工藝報告...")
                 intelligence_prompt = f"你是一位精密系統設計的逆向工程專家。工件檔名為 {file_name}，包絡體邊界尺寸為 {bounding_box_str}。請在 120 字內針對此工件給予 FDM 3D列印層高、列印速度建議，並給予 Arduino 自動化旋轉轉盤馬達轉速的具體參數調校參數。"
-                
-                if ai_mode == "本地邊緣算力 (Ollama)":
-                    diagnosis_text = ask_ollama_local(intelligence_prompt, endpoint_url=ollama_endpoint, model_name=ollama_model)
-                else:
-                    diagnosis_text = ask_gemini_via_http(intelligence_prompt)
+                diagnosis_text = ask_gemini_via_http(intelligence_prompt)
 
                 status.write("💾 正在向資料表登錄核心資產數據...")
                 taiwan_now = (datetime.utcnow() + timedelta(hours=8)).isoformat()
@@ -288,7 +255,7 @@ with tab1:
                     
                     canvas_slot = st.container()
                     
-                    # 🪐 經典雙欄排版
+                    # 🪐 左右經典雙欄分流
                     photo_col, metric_col = st.columns([1, 1.2])
                     state_photo_key = f"db_b64_photo_cache_{asset_id}"
                     
@@ -301,7 +268,7 @@ with tab1:
                             st.image("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80", 
                                      caption="🎨 系統自動擷取預設 3D 封面", use_container_width=True)
                             
-                        # 📸 【照片同步刻錄流道】
+                        # 📸 【全自動即時照片刻錄流道】
                         img_file = st.file_uploader("📷 手動更換封面照片 (免按鈕・選好秒同步)", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
                         if img_file is not None and f"p_done_{asset_id}" not in st.session_state:
                             with st.spinner("📦 正在將照片永久綁定至雲端資料庫..."):
@@ -370,7 +337,6 @@ with tab1:
                         else:
                             if st.button(f"🗑️ 銷毀", key=f"del_{asset_id}", use_container_width=True):
                                 requests.delete(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS)
-                                if state_photo_key in st.session_state: del st.session_state[state_photo_key]
                                 st.toast("已從雲端銷毀")
                                 time.sleep(0.5)
                                 st.rerun()
@@ -440,11 +406,7 @@ with tab2:
             with st.spinner("🤖 正在調度生成式智慧進行大數據分析..."):
                 try:
                     intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據 trends，給予大三專題口試時的亮點提問應對技巧，並針對製程自動化步進馬達調校與 FDM 速度給予 150 字內的深入分析報告：\n{all_assets_context}"
-                    
-                    if ai_mode == "本地邊緣算力 (Ollama)":
-                        st.session_state["cached_diagnostic_report"] = ask_ollama_local(intelligence_prompt, endpoint_url=ollama_endpoint, model_name=ollama_model)
-                    else:
-                        st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
+                    st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
                 except Exception as e: 
                     st.error(f"🧠 AI 通訊異常: {str(e)[:40]}")
         if "cached_diagnostic_report" in st.session_state:
