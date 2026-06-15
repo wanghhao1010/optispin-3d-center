@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [Base64 本地瞬間回填・口試絕對必勝完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [拼字修正・口試絕對大通車大圓滿完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -10,7 +10,7 @@ import time
 import io
 import requests  
 import random  
-import base64  # 🎯 引入純文字轉碼核心，一秒戳碎一切上傳鎖定 Bug！
+import base64  
 from datetime import datetime, timedelta  
 
 # 1. 系統網頁頂層基礎配置
@@ -40,7 +40,7 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 核心讀取流道：精準欄位對齊，全量大通車"""
+    """🚀 核心讀取流道：精準欄位對齊"""
     clean_list = []
     try:
         fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_diagnosis"
@@ -80,7 +80,7 @@ def fetch_lightweight_assets():
     except Exception:
         pass
 
-    # 系統內建範例底座
+    # 系統內建範例底座，確保清空資料庫時完美展現章魚腳 Demo
     if len(clean_list) == 0:
         demo_row = {
             "id": 0,
@@ -89,7 +89,7 @@ def fetch_lightweight_assets():
             "vertices": 68421,
             "faces": 136842,
             "dimensions": "124.5 x 112.8 x 156.2 mm",
-            "ai_report": "【內建範例報告】此工件幾何懸空結構高。 FDM 參數：層高 0.12mm、速度 45mm/s。自動化步進馬達建議調校至 6 RPM 慢速掃描最佳。",
+            "ai_report": "【系統內建範例】此工件為幾何扭曲懸空結構。 FDM 參數：層高 0.12mm、速度 45mm/s。自動化步進馬達建議調校至 6 RPM 慢速掃描最佳。",
             "filesize": "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
             "photo_url": "fallback_demo" 
         }
@@ -133,7 +133,7 @@ def ask_gemini_via_http(prompt_text):
         return f"精密工件數位雙生收錄成功。［通訊提示 {str(e)[:20]}］"
 
 # ============================================================================== #
-# 🎨 前端 UI 渲染
+# 🎨 前端 UI 渲染 (經典手動拍照與更名並裝版)
 # ============================================================================== #
 
 banner_html = """
@@ -261,17 +261,15 @@ with tab1:
                     state_photo_key = f"cached_b64_photo_{asset_id}"
                     
                     with photo_col:
-                        # 📷 【手動更換封面照片功能：極速二進位 Base64 現場同步監聽機制】
+                        # 📷 【手動更換封面照片：Base64 現場同步監聽】
                         img_file = st.file_uploader("📷 手動更換封面照片 (免按鈕・選好秒同步)", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
-                        
                         if img_file is not None:
-                            # 🎯 工業級絕殺：現場直接把檔案轉碼成字串，無痛在手機本地端秒速顯示，徹底繞過所有雲端限制！
                             try:
                                 base64_data = base64.b64encode(img_file.read()).decode("utf-8")
                                 st.session_state[state_photo_key] = f"data:image/jpeg;base64,{base64_data}"
                             except Exception: pass
 
-                        # 🎯 封面圖源最優先級渲染判斷層
+                        # 🎯 封面圖源最優先級渲染
                         if state_photo_key in st.session_state:
                             st.image(st.session_state[state_photo_key], caption="📸 現場實體工件預覽封面 (記憶體即時對齊)", use_container_width=True)
                         elif current_photo and str(current_photo).startswith("http"):
@@ -309,7 +307,8 @@ with tab1:
                     with view_col1:
                         if file_url and file_url.startswith("http"):
                             if st.button(f"🛰️ 實體全貼圖", key=f"btn_m_{asset_id}", use_container_width=True, type="primary"):
-                                st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_mesh_toggle_key, False)
+                                # 🎯 【拼字修正點】：精準對齊 st.session_state[mesh_toggle_key]，徹底粉碎 NameError 閃退！
+                                st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
                                 st.session_state[pc_toggle_key] = False
                                 st.rerun()
                             
