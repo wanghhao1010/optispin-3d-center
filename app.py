@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [PUT強行覆蓋流・大圓滿通車終極完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [手動照片分流 + 物件正名・終極完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -39,9 +39,10 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 核心讀取流道：精準欄位對齊"""
+    """🚀 核心讀取流道：精準欄位對齊，全量大通車"""
     clean_list = []
     try:
+        # 🎯 精準抓取你資料表真正的 7 大輕量欄位
         fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_diagnosis"
         url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc"
         
@@ -56,6 +57,7 @@ def fetch_lightweight_assets():
                 db_file_url = row.get("filesize", "")
                 db_file_str = str(db_file_url) if db_file_url else ""
                 
+                # 歷史巨大 Base64 舊資料安全過濾切斷
                 if len(db_file_str) > 1000 or not db_file_str.startswith("http"):
                     final_url = ""
                 else:
@@ -73,36 +75,36 @@ def fetch_lightweight_assets():
                     "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
                     "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "工件數位雙生收錄成功。",
                     "filesize": final_url,
-                    "photo_url": row.get("file_path", "")
+                    "photo_url": row.get("file_path", "")  # 🎯 讀取用來存照片網址的 file_path 欄位
                 }
                 clean_list.append(safe_row)
     except Exception:
         pass
 
-    # 系統內建範例防開天窗底座
+    # 系統內建範例底座，確保清空資料庫時完美展現章魚腳 Demo
     if len(clean_list) == 0:
         demo_row = {
             "id": 0,
             "filename": "Scaniverse_Octopus_Tentacle_Demo.glb",
-            "timestamp": "2026-06-15 08:00 (系統範例)",
+            "timestamp": "2026-06-15 08:00 (內建範例)",
             "vertices": 68421,
             "faces": 136842,
             "dimensions": "124.5 x 112.8 x 156.2 mm",
             "ai_report": "【系統內建範例】此工件為幾何扭曲懸空結構。建議 FDM 參數：層高 0.12mm、速度 45mm/s。自動化步進馬達建議調校至 6 RPM 慢速掃描以防晃動產生拓撲噪點。",
             "filesize": "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
-            "photo_url": "fallback_demo"
+            "photo_url": "https://pwmijkkzufcqrnmodxap.supabase.co/storage/v1/object/public/saved_images/OmniSpin%203D%20Scanning%20System.png" # 預設載入超美章魚腳照片封面
         }
         clean_list.append(demo_row)
         
     return clean_list
 
-def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶發射器：全面改為 PUT 強行覆蓋流，徹底打碎 400 重複拒絕死鎖！"""
+def upload_to_supabase_storage(file_name, file_bytes, bucket="models"):
+    """📦 儲存桶發射器：支援模型模型與實體相片雙通路強行覆蓋上傳"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
-    rand_id = random.randint(10000, 99999) # 升級至 5 位數絕對防禦防撞金鑰
+    rand_id = random.randint(10000, 99999)
     clean_name = file_name.replace(" ", "_")
     unique_filename = f"{timestamp_prefix}_{rand_id}_{clean_name}"
-    upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
+    upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/{bucket}/{unique_filename}"
     
     storage_headers = {
         "apikey": SUPABASE_KEY,
@@ -110,10 +112,10 @@ def upload_to_supabase_storage(file_name, file_bytes):
         "Content-Type": "application/octet-stream"
     }
     try:
-        # 🎯 【終極殺招】：改用 requests.put 強行霸道寫入，排除一切儲存桶檔案排斥問題
+        # 🎯 使用 PUT 覆蓋指令，確保絕不因為檔名重複而被 Supabase 擋在門外
         res = requests.put(upload_url, headers=storage_headers, data=file_bytes, timeout=30)
         if res.status_code in [200, 201]:
-            return f"{STORAGE_URL}{unique_filename}"
+            return f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/{bucket}/{unique_filename}"
         return ""
     except Exception:
         return ""
@@ -133,7 +135,7 @@ def ask_gemini_via_http(prompt_text):
         return f"精密工件數位雙生收錄成功。［通訊提示 {str(e)[:20]}］"
 
 # ============================================================================== #
-# 🎨 前端 UI 渲染 (視覺完全體)
+# 🎨 核心主網頁前端 UI 渲染 (經典手動拍照與更名並裝版)
 # ============================================================================== #
 
 banner_html = """
@@ -192,10 +194,10 @@ with tab1:
                     except Exception: pass
                 
                 status.write("📦 正在將實體圖檔空投至 Supabase Storage 儲存桶...")
-                model_url = upload_to_supabase_storage(file_name, file_bytes)
+                model_url = upload_to_supabase_storage(file_name, file_bytes, bucket="models")
                 
                 if not model_url:
-                    st.error("❌ 儲存桶覆蓋失敗，請重新嘗試。")
+                    st.error("❌ 儲存桶上傳超時。")
                     st.session_state["upload_triggered"] = False
                     st.stop()
 
@@ -206,11 +208,12 @@ with tab1:
                 status.write("💾 正在向資料表登錄核心資產數據...")
                 taiwan_now = (datetime.utcnow() + timedelta(hours=8)).isoformat()
                 
+                # 🎯 【終極修復】：filesize 對齊欄位，精準寫入剛才拿到的儲存桶真實短網址
                 asset_row = {
                     "filename": file_name, 
                     "timestamp": taiwan_now,  
                     "filesize": model_url,          
-                    "file_path": "", 
+                    "file_path": "", # 初始相片空置
                     "dimensions": bounding_box_str,  
                     "ai_diagnosis": diagnosis_text 
                 }
@@ -233,10 +236,10 @@ with tab1:
                 st.session_state["upload_triggered"] = False
                 st.stop()
 
-    # 🔍 3D 雲端資產搜尋與渲染儀表板
+    # 🔍 3D 雲端資產動態搜尋倉儲展示區
     st.markdown("---")
     display_count = 0 if len(cloud_data) == 1 and cloud_data[0]["id"] == 0 else len(cloud_data)
-    st.subheader(f"🔍 3D 雲端資產動態搜尋倉儲 (目前雲端總計: {display_count} 筆)")
+    st.subheader(f"🔍 3D 雲端資產倉儲 (目前雲端總計: {display_count} 筆)")
     search_query = st.text_input("搜尋資產名稱", placeholder="輸入關鍵字篩選...", key="main_search_input", label_visibility="collapsed")
     
     if cloud_data:
@@ -247,55 +250,69 @@ with tab1:
                     fname = item.get('filename')
                     asset_id = item.get('id')
                     file_url = item.get('filesize', '')
+                    current_photo = item.get('photo_url', '')
                     is_usdz = str(fname).lower().endswith('.usdz')
                     is_demo = (asset_id == 0)
                     
-                    st.markdown(f"### 📄 檔案: **{fname}**")
-                    st.caption(f"🕒 上傳時間 (台北時間): {item.get('timestamp')}")
+                    st.markdown(f"### 📄 資產名稱: **{fname}**")
+                    st.caption(f"🕒 上傳時間 (台北時間): {item.get('timestamp')} | 雲端編號 ID: {asset_id}")
                     
-                    # 3D 動態彩色封面即時加載區
-                    if file_url and file_url.startswith("http"):
-                        if is_usdz:
-                            st.image("https://pwmijkkzufcqrnmodxap.supabase.co/storage/v1/object/public/saved_images/OmniSpin%203D%20Scanning%20System.png", caption="🪐 iOS 原生空間資產外觀預覽", use_container_width=True)
+                    canvas_slot = st.container()
+                    
+                    # 🪐 【左右分流經典排版歸位】：左側放手動更換封面照、右側放幾何數據與更名！
+                    photo_col, metric_col = st.columns([1, 1.2])
+                    with photo_col:
+                        if current_photo and str(current_photo).startswith("http"):
+                            st.image(current_photo, caption="📸 現場實體工件預覽封面", use_container_width=True)
                         else:
-                            html_canvas = f"""
-                            <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
-                            <model-viewer src="{file_url}" alt="OptiSpin GLB" camera-controls auto-rotate style="width: 100%; height: 280px; background-color: #111111; border-radius: 12px;"></model-viewer>
-                            """
-                            st.components.v1.html(html_canvas, height=290)
+                            st.warning("⚠️ 尚無預覽封面")
+                            
+                        # 📸 【功能一：手動更換封面功能】
+                        img_file = st.file_uploader("📷 手動更換封面照片", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
+                        if img_file is not None:
+                            if st.button("📤 上傳更換照片", key=f"img_btn_{asset_id}", use_container_width=True):
+                                with st.spinner("📦 正在將封面送入 saved_images 儲存桶..."):
+                                    p_url = upload_to_supabase_storage(img_file.name, img_file.read(), bucket="saved_images")
+                                    if p_url:
+                                        requests.patch(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS, json={"file_path": p_url})
+                                        st.toast("📸 預覽封面同步大功告成！")
+                                        time.sleep(0.5)
+                                        st.rerun()
 
-                    # 數據層
-                    col1, col2 = st.columns(2)
-                    with col1: st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
-                    with col2: st.metric("工業邊界包絡體 (Dimensions)", item.get('dimensions', '無法計算'))
-                    
-                    if not is_demo:
-                        new_name = st.text_input("✏️ 修改資產名稱", value=fname, key=f"edit_name_{asset_id}")
-                        if new_name != fname:
-                            if st.button("💾 確認變更名稱", key=f"save_name_{asset_id}"):
-                                requests.patch(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS, json={"filename": new_name})
-                                st.toast("✏️ 物件有名成功！")
-                                time.sleep(0.5)
-                                st.rerun()
+                    with metric_col:
+                        st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
+                        st.metric("工業邊界包絡體 (Dimensions)", item.get('dimensions', '無法計算'))
+                        
+                        # ✏️ 【功能二：修改模型名稱功能】
+                        if not is_demo:
+                            new_name = st.text_input("✏️ 修改模型名稱", value=fname, key=f"edit_name_{asset_id}")
+                            if new_name != fname:
+                                if st.button("💾 確認變更名稱", key=f"save_name_{asset_id}"):
+                                    requests.patch(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS, json={"filename": new_name})
+                                    st.toast("✏️ 物件名稱修訂成功！")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                        else:
+                            st.button("🔺 範例名稱唯讀", key=f"disabled_rename_{asset_id}", disabled=True, use_container_width=True)
 
                     st.info(f"🤖 Gemini 智慧評估報告：\n{item.get('ai_report')}")
 
+                    mesh_toggle_key = f"toggle_mesh_{asset_id}"
                     pc_toggle_key = f"toggle_pc_{asset_id}"
-                    view_col1, del_col = st.columns([2, 1])
-                    
+
+                    view_col1, view_col2, del_col = st.columns([1.2, 1.2, 1])
                     with view_col1:
-                        if is_usdz:
-                            html_ar_code = f"""
-                            <a href="{file_url}" rel="ar" style="text-decoration: none; display: block;">
-                                <div style="background-color: #ff4b4b; color: white; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0px 4px 10px rgba(0,0,0,0.2);">
-                                    📱 啟動 iPhone 空間 3D AR 投放檢視
-                                </div>
-                            </a>
-                            """
-                            st.components.v1.html(html_ar_code, height=55)
-                        else:
-                            if st.button(f"🌌 展開單色物理拓撲點雲矩陣", key=f"btn_pc_{asset_id}", use_container_width=True):
+                        if file_url and file_url.startswith("http"):
+                            if st.button(f"🛰️ 實體全貼圖", key=f"btn_m_{asset_id}", use_container_width=True, type="primary"):
+                                st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
+                                st.session_state[pc_toggle_key] = False
+                                st.rerun()
+                            
+                    with view_col2:
+                        if file_url and file_url.startswith("http"):
+                            if st.button(f"🌌 模擬點雲", key=f"btn_pc_{asset_id}", use_container_width=True):
                                 st.session_state[pc_toggle_key] = not st.session_state.get(pc_toggle_key, False)
+                                st.session_state[mesh_toggle_key] = False
                                 st.rerun()
 
                     with del_col:
@@ -306,22 +323,52 @@ with tab1:
                                 requests.delete(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS)
                                 st.toast("已從雲端銷毀")
                                 time.sleep(0.5)
-                                r = requests.get(f"{BASE_URL}{TABLE_NAME}") # 確保狀態清除
                                 st.rerun()
 
-                    if st.session_state.get(pc_toggle_key, False) and file_url:
-                        with st.spinner("🌌 正在逆向還原拓撲點雲..."):
-                            try:
-                                res_file = requests.get(file_url, timeout=15)
-                                scene_or_m = trimesh.load(io.BytesIO(res_file.content), file_type='glb')
-                                c_mesh = list(scene_or_m.geometry.values())[0] if isinstance(scene_or_m, trimesh.Scene) else scene_or_m
-                                indices = np.random.choice(len(c_mesh.vertices), min(len(c_mesh.vertices), 1800), replace=False)
-                                pts = c_mesh.vertices[indices] * 1000.0
-                                
-                                fig = go.Figure(data=[go.Scatter3d(x=pts[:, 0], y=pts[:, 1], z=pts[:, 2], mode='markers', marker=dict(size=2.8, color='#ffffff', opacity=0.88))])
-                                fig.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), bgcolor="black"), margin=dict(r=0, l=0, b=0, t=0), paper_bgcolor="black", height=300)
-                                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                            except Exception: st.error("🔺 點雲拓撲還原超時")
+                    # 🎯 展開渲染滑出槽
+                    with canvas_slot:
+                        if st.session_state.get(mesh_toggle_key, False) and file_url:
+                            if is_usdz:
+                                st.success("🍏 已成功解鎖 iOS 原生 AR 空間投放安全通路！")
+                                html_ar_code = f"""
+                                <a href="{file_url}" rel="ar" style="text-decoration: none;">
+                                    <img src="https://developer.apple.com/assets/elements/icons/augmented-reality/augmented-reality-64x64.png" style="width:32px; vertical-align:middle; margin-right:10px;">
+                                    <span style="background-color: #ff4b4b; color: white; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0px 4px 10px rgba(0,0,0,0.25); display: inline-block; vertical-align: middle;">
+                                        📱 點擊此處 → 立即啟動 3D 原生相機空間檢視
+                                    </span>
+                                </a>
+                                """
+                                st.components.v1.html(html_ar_code, height=75)
+                            else:
+                                html_canvas = f"""
+                                <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+                                <model-viewer src="{file_url}" alt="OptiSpin GLB" camera-controls auto-rotate style="width: 100%; height: 320px; background-color: #1a1a1a; border-radius: 10px;"></model-viewer>
+                                """
+                                st.components.v1.html(html_canvas, height=330)
+
+                        if st.session_state.get(pc_toggle_key, False) and file_url:
+                            with st.spinner("🌌 正在從雲端數據庫逆向還原拓撲點雲..."):
+                                try:
+                                    if is_usdz:
+                                        t = np.linspace(0, 2*np.pi, 1100)
+                                        x = np.sin(t) * np.cos(t*12) * 45
+                                        y = np.cos(t) * np.cos(t*12) * 45
+                                        z = np.sin(t*4) * 75 + 35
+                                        base_pts = np.column_stack((x, y, z))
+                                        pts = base_pts + np.random.normal(0, 3.5, base_pts.shape)
+                                        pt_color = '#00f0ff'
+                                    else:
+                                        res_file = requests.get(file_url, timeout=15)
+                                        scene_or_m = trimesh.load(io.BytesIO(res_file.content), file_type='glb')
+                                        c_mesh = list(scene_or_m.geometry.values())[0] if isinstance(scene_or_m, trimesh.Scene) else scene_or_m
+                                        indices = np.random.choice(len(c_mesh.vertices), min(len(c_mesh.vertices), 1800), replace=False)
+                                        pts = c_mesh.vertices[indices] * 1000.0
+                                        pt_color = '#ffffff'
+                                        
+                                    fig = go.Figure(data=[go.Scatter3d(x=pts[:, 0], y=pts[:, 1], z=pts[:, 2], mode='markers', marker=dict(size=2.8, color=pt_color, opacity=0.88))])
+                                    fig.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), bgcolor="black"), margin=dict(r=0, l=0, b=0, t=0), paper_bgcolor="black", height=320)
+                                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                                except Exception: st.error("🔺 點雲拓撲還原超時")
 
                     st.markdown("<hr style='margin: 15px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
         else:
