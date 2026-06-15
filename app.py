@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [Gemini 2.5-Flash 全面覺醒終極體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [視覺Banner歸位・終極大圓滿完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -105,8 +105,7 @@ def upload_to_supabase_storage(file_name, file_bytes):
         return ""
 
 def ask_gemini_via_http(prompt_text):
-    """🧠 【純 HTTP 絕殺通道】：全線升級至全球最新官方商業版 gemini-2.5-flash，徹底粉碎 404 封鎖！"""
-    # 🎯 【關鍵微調】：精準換成官方 2026 最新正式版 gemini-2.5-flash
+    """🧠 【純 HTTP 絕殺通道】：全線升級至全球最新官方商業版 gemini-2.5-flash"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
@@ -125,9 +124,19 @@ def ask_gemini_via_http(prompt_text):
         return f"精密工件數位雙生收錄成功。［網絡提示：通訊異常 {str(e)[:20]}］"
 
 # ============================================================================== #
-# 🎨 核心主網頁前端 UI 渲染 (分頁全量並裝)
+# 🎨 核心主網頁前端 UI 渲染 (高質感橫幅視覺包裝版)
 # ============================================================================== #
 
+# 🎯 【視覺經典回歸】：利用 HTML 容器強行注入你最喜歡的工業設計立體漸層橫幅圖片
+banner_html = """
+<div style="width: 100%; overflow: hidden; border-radius: 12px; margin-bottom: -10px;">
+    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" 
+         style="width: 100%; max-height: 200px; object-fit: cover; filter: brightness(0.95) contrast(1.05);">
+</div>
+"""
+st.components.v1.html(banner_html, height=180)
+
+# 標題與學程資訊
 st.title("🛸 OptiSpin 3D 控制中心")
 st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生管理端")
 
@@ -184,7 +193,6 @@ with tab1:
                     st.session_state["upload_triggered"] = False
                     st.stop()
 
-                # 🎯 【2.5 商業級分析通道啟動】
                 status.write("🤖 正在調度全球最新 Gemini 2.5 專家系統生成精準工藝報告...")
                 intelligence_prompt = f"你是一位精密系統設計的逆向工程專家。工件檔名為 {file_name}，包絡體邊界尺寸為 {bounding_box_str}。請在 120 字內針對此工件給予 FDM 3D列印層高、列印速度建議，並給予 Arduino 自動化旋轉轉盤馬達轉速的具體參數調校。"
                 diagnosis_text = ask_gemini_via_http(intelligence_prompt)
@@ -334,8 +342,10 @@ with tab2:
         all_assets_context = "\n".join(assets_summary_list)
         if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
             with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
-                # 🎯 分頁二也同步升級到 2.5-flash 正式商業版端點
-                intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢，給予大三專題口試時的亮點提問應對技巧，並針對製程自動化步進馬達調校與 FDM 速度給予 150 字內的深入分析報告：\n{all_assets_context}"
-                st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
+                try:
+                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢，給予大三專題口試時的亮點提問應對技巧，並針對製程自動化步進馬達調校與 FDM 速度給予 150 字內的深入分析報告：\n{all_assets_context}"
+                    st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
+                except Exception as e: 
+                    st.error(f"🧠 AI 通訊異常: {str(e)[:40]}")
         if "cached_diagnostic_report" in st.session_state:
             st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px; color:#ffffff;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
