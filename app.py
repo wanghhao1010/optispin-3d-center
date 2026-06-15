@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [視覺Banner歸位・終極大圓滿完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [專題實體 Banner 歸位・終極完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -105,7 +105,7 @@ def upload_to_supabase_storage(file_name, file_bytes):
         return ""
 
 def ask_gemini_via_http(prompt_text):
-    """🧠 【純 HTTP 絕殺通道】：全線升級至全球最新官方商業版 gemini-2.5-flash"""
+    """🧠 【純 HTTP 絕殺通道】：全線升級至全球最新官方商業版 gemini-2.5-flash，徹底粉碎 404/500 封鎖！"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{
@@ -124,13 +124,13 @@ def ask_gemini_via_http(prompt_text):
         return f"精密工件數位雙生收錄成功。［網絡提示：通訊異常 {str(e)[:20]}］"
 
 # ============================================================================== #
-# 🎨 核心主網頁前端 UI 渲染 (高質感橫幅視覺包裝版)
+# 🎨 核心主網頁前端 UI 渲染 (高質感實體專題照片橫幅版)
 # ============================================================================== #
 
-# 🎯 【視覺經典回歸】：利用 HTML 容器強行注入你最喜歡的工業設計立體漸層橫幅圖片
+# 🎯 【專題視覺歸位】：已成功替換為你上傳的 OmniSpin 3D 轉盤實體掃描系統照片！
 banner_html = """
 <div style="width: 100%; overflow: hidden; border-radius: 12px; margin-bottom: -10px;">
-    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80" 
+    <img src="https://pwmijkkzufcqrnmodxap.supabase.co/storage/v1/object/public/saved_images/OmniSpin%203D%20Scanning%20System.png" 
          style="width: 100%; max-height: 200px; object-fit: cover; filter: brightness(0.95) contrast(1.05);">
 </div>
 """
@@ -198,6 +198,7 @@ with tab1:
                 diagnosis_text = ask_gemini_via_http(intelligence_prompt)
 
                 status.write("💾 正在向資料表登錄核心資產數據...")
+                # 🕒 台北時區精準對齊，防止伺服器在國外造成日期錯亂
                 taiwan_now = (datetime.utcnow() + timedelta(hours=8)).isoformat()
                 
                 asset_row = {
@@ -263,7 +264,7 @@ with tab1:
                                 st.session_state[pc_toggle_key] = False
                                 st.rerun()
                         else:
-                            st.button("🔺 歷史唯讀數據資產", key=f"btn_m_{asset_id}", disabled=True, use_container_width=True)
+                            st.button("🔺 歷史唯慢資產", key=f"btn_m_{asset_id}", disabled=True, use_container_width=True)
                             
                     with view_col2:
                         if file_url and file_url.startswith("http"):
