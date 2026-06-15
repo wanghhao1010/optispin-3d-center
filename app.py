@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [UUID實體隔離・全量大通車終極完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [PUT強行覆蓋流・大圓滿通車終極完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -9,7 +9,7 @@ import os
 import time
 import io
 import requests  
-import random  # 🎯 引入隨機金鑰核心，徹底粉碎覆蓋 Bug
+import random  
 from datetime import datetime, timedelta  
 
 # 1. 系統網頁頂層基礎配置
@@ -97,10 +97,9 @@ def fetch_lightweight_assets():
     return clean_list
 
 def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶發射器：導入毫秒級四碼隨機防禦金鑰，物理隔離覆蓋 Bug！"""
+    """📦 儲存桶發射器：全面改為 PUT 強行覆蓋流，徹底打碎 400 重複拒絕死鎖！"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
-    # 🎯 【核心修正】：在檔名前方現場生成一個 1000 到 9999 的隨機數，確保網址絕對不撞車覆蓋！
-    rand_id = random.randint(1000, 9999)
+    rand_id = random.randint(10000, 99999) # 升級至 5 位數絕對防禦防撞金鑰
     clean_name = file_name.replace(" ", "_")
     unique_filename = f"{timestamp_prefix}_{rand_id}_{clean_name}"
     upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
@@ -111,7 +110,8 @@ def upload_to_supabase_storage(file_name, file_bytes):
         "Content-Type": "application/octet-stream"
     }
     try:
-        res = requests.post(upload_url, headers=storage_headers, data=file_bytes, timeout=30)
+        # 🎯 【終極殺招】：改用 requests.put 強行霸道寫入，排除一切儲存桶檔案排斥問題
+        res = requests.put(upload_url, headers=storage_headers, data=file_bytes, timeout=30)
         if res.status_code in [200, 201]:
             return f"{STORAGE_URL}{unique_filename}"
         return ""
@@ -195,7 +195,7 @@ with tab1:
                 model_url = upload_to_supabase_storage(file_name, file_bytes)
                 
                 if not model_url:
-                    st.error("❌ 儲存桶通道異常。")
+                    st.error("❌ 儲存桶覆蓋失敗，請重新嘗試。")
                     st.session_state["upload_triggered"] = False
                     st.stop()
 
@@ -295,7 +295,7 @@ with tab1:
                             st.components.v1.html(html_ar_code, height=55)
                         else:
                             if st.button(f"🌌 展開單色物理拓撲點雲矩陣", key=f"btn_pc_{asset_id}", use_container_width=True):
-                                st.session_state[pc_toggle_key] = not st.session_state.get(pc_pc_toggle_key, False)
+                                st.session_state[pc_toggle_key] = not st.session_state.get(pc_toggle_key, False)
                                 st.rerun()
 
                     with del_col:
@@ -306,6 +306,7 @@ with tab1:
                                 requests.delete(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS)
                                 st.toast("已從雲端銷毀")
                                 time.sleep(0.5)
+                                r = requests.get(f"{BASE_URL}{TABLE_NAME}") # 確保狀態清除
                                 st.rerun()
 
                     if st.session_state.get(pc_toggle_key, False) and file_url:
