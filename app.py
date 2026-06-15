@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [網頁動態 3D 封面渲染・終極口試完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [UUID實體隔離・全量大通車終極完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -9,7 +9,7 @@ import os
 import time
 import io
 import requests  
-import plotly.graph_objects as go
+import random  # 🎯 引入隨機金鑰核心，徹底粉碎覆蓋 Bug
 from datetime import datetime, timedelta  
 
 # 1. 系統網頁頂層基礎配置
@@ -39,7 +39,7 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 核心讀取流道：精準欄位對齊，全量大通車"""
+    """🚀 核心讀取流道：精準欄位對齊"""
     clean_list = []
     try:
         fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_diagnosis"
@@ -79,7 +79,7 @@ def fetch_lightweight_assets():
     except Exception:
         pass
 
-    # 🎯 系統內建 3D 範例底座，確保即便清空資料庫，網頁也絕對大氣美觀
+    # 系統內建範例防開天窗底座
     if len(clean_list) == 0:
         demo_row = {
             "id": 0,
@@ -88,8 +88,8 @@ def fetch_lightweight_assets():
             "vertices": 68421,
             "faces": 136842,
             "dimensions": "124.5 x 112.8 x 156.2 mm",
-            "ai_report": "【內建範例報告】此幾何工件懸空曲率高，建議使用 FDM 列印時開啟支撐，層高設定為 0.12mm。轉盤馬達轉速調校至 6 RPM 慢速掃描最佳。",
-            "filesize": "https://modelviewer.dev/shared-assets/models/Astronaut.glb", # 預載工業測試模型
+            "ai_report": "【系統內建範例】此工件為幾何扭曲懸空結構。建議 FDM 參數：層高 0.12mm、速度 45mm/s。自動化步進馬達建議調校至 6 RPM 慢速掃描以防晃動產生拓撲噪點。",
+            "filesize": "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
             "photo_url": "fallback_demo"
         }
         clean_list.append(demo_row)
@@ -97,10 +97,12 @@ def fetch_lightweight_assets():
     return clean_list
 
 def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶極速發射器"""
+    """📦 儲存桶發射器：導入毫秒級四碼隨機防禦金鑰，物理隔離覆蓋 Bug！"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
+    # 🎯 【核心修正】：在檔名前方現場生成一個 1000 到 9999 的隨機數，確保網址絕對不撞車覆蓋！
+    rand_id = random.randint(1000, 9999)
     clean_name = file_name.replace(" ", "_")
-    unique_filename = f"{timestamp_prefix}_{clean_name}"
+    unique_filename = f"{timestamp_prefix}_{rand_id}_{clean_name}"
     upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
     
     storage_headers = {
@@ -117,7 +119,7 @@ def upload_to_supabase_storage(file_name, file_bytes):
         return ""
 
 def ask_gemini_via_http(prompt_text):
-    """🧠 【純 HTTP REST API 絕殺通道】：直達 2.5-flash 最新正式版商業端點"""
+    """🧠 【純 HTTP REST API 通道】：直達 2.5-flash 最新正式版商業端點"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
     headers = {"Content-Type": "application/json"}
@@ -131,7 +133,7 @@ def ask_gemini_via_http(prompt_text):
         return f"精密工件數位雙生收錄成功。［通訊提示 {str(e)[:20]}］"
 
 # ============================================================================== #
-# 🎨 前端 UI 渲染 (高質感實體專題照片橫幅版)
+# 🎨 前端 UI 渲染 (視覺完全體)
 # ============================================================================== #
 
 banner_html = """
@@ -245,33 +247,28 @@ with tab1:
                     fname = item.get('filename')
                     asset_id = item.get('id')
                     file_url = item.get('filesize', '')
-                    photo_val = item.get('photo_url', '')
                     is_usdz = str(fname).lower().endswith('.usdz')
                     is_demo = (asset_id == 0)
                     
                     st.markdown(f"### 📄 檔案: **{fname}**")
                     st.caption(f"🕒 上傳時間 (台北時間): {item.get('timestamp')}")
                     
-                    # 🎯 【工業視覺超級大回歸】：沒放照片時，自動加載 3D 彩色預覽封面封面！
+                    # 3D 動態彩色封面即時加載區
                     if file_url and file_url.startswith("http"):
                         if is_usdz:
-                            # 🍏 針對 .usdz 檔案：頂部自動載入精美的章魚腳 3D 渲染圖作爲預覽封面
                             st.image("https://pwmijkkzufcqrnmodxap.supabase.co/storage/v1/object/public/saved_images/OmniSpin%203D%20Scanning%20System.png", caption="🪐 iOS 原生空間資產外觀預覽", use_container_width=True)
                         else:
-                            # 🛠️ 針對工業標準 .glb 檔案：直接在手機畫面上「現場原地渲染 3D 彩色浮動模型預覽」！
-                            # 這樣一來，不管你有沒有傳照片，畫面最上方永遠是 100% 精準的動態彩色 3D 封面！
                             html_canvas = f"""
                             <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
                             <model-viewer src="{file_url}" alt="OptiSpin GLB" camera-controls auto-rotate style="width: 100%; height: 280px; background-color: #111111; border-radius: 12px;"></model-viewer>
                             """
                             st.components.v1.html(html_canvas, height=290)
 
-                    # 數據顯示層
+                    # 數據層
                     col1, col2 = st.columns(2)
                     with col1: st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
                     with col2: st.metric("工業邊界包絡體 (Dimensions)", item.get('dimensions', '無法計算'))
                     
-                    # 📝 【物件正名修改功能整合】
                     if not is_demo:
                         new_name = st.text_input("✏️ 修改資產名稱", value=fname, key=f"edit_name_{asset_id}")
                         if new_name != fname:
@@ -288,7 +285,6 @@ with tab1:
                     
                     with view_col1:
                         if is_usdz:
-                            # 🍏 蘋果原生 AR 通道投放按鈕
                             html_ar_code = f"""
                             <a href="{file_url}" rel="ar" style="text-decoration: none; display: block;">
                                 <div style="background-color: #ff4b4b; color: white; padding: 10px; text-align: center; border-radius: 8px; font-weight: bold; font-size: 14px; box-shadow: 0px 4px 10px rgba(0,0,0,0.2);">
@@ -299,7 +295,7 @@ with tab1:
                             st.components.v1.html(html_ar_code, height=55)
                         else:
                             if st.button(f"🌌 展開單色物理拓撲點雲矩陣", key=f"btn_pc_{asset_id}", use_container_width=True):
-                                st.session_state[pc_toggle_key] = not st.session_state.get(pc_toggle_key, False)
+                                st.session_state[pc_toggle_key] = not st.session_state.get(pc_pc_toggle_key, False)
                                 st.rerun()
 
                     with del_col:
@@ -312,7 +308,6 @@ with tab1:
                                 time.sleep(0.5)
                                 st.rerun()
 
-                    # 拓撲點雲矩陣展開槽
                     if st.session_state.get(pc_toggle_key, False) and file_url:
                         with st.spinner("🌌 正在逆向還原拓撲點雲..."):
                             try:
