@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [手動照片分流 + 物件正名・終極完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [預設漸層封面 + 左右經典分流完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -42,7 +42,6 @@ def fetch_lightweight_assets():
     """🚀 核心讀取流道：精準欄位對齊，全量大通車"""
     clean_list = []
     try:
-        # 🎯 精準抓取你資料表真正的 7 大輕量欄位
         fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_diagnosis"
         url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc"
         
@@ -57,7 +56,6 @@ def fetch_lightweight_assets():
                 db_file_url = row.get("filesize", "")
                 db_file_str = str(db_file_url) if db_file_url else ""
                 
-                # 歷史巨大 Base64 舊資料安全過濾切斷
                 if len(db_file_str) > 1000 or not db_file_str.startswith("http"):
                     final_url = ""
                 else:
@@ -75,7 +73,7 @@ def fetch_lightweight_assets():
                     "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
                     "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "工件數位雙生收錄成功。",
                     "filesize": final_url,
-                    "photo_url": row.get("file_path", "")  # 🎯 讀取用來存照片網址的 file_path 欄位
+                    "photo_url": row.get("file_path", "")  
                 }
                 clean_list.append(safe_row)
     except Exception:
@@ -92,14 +90,14 @@ def fetch_lightweight_assets():
             "dimensions": "124.5 x 112.8 x 156.2 mm",
             "ai_report": "【系統內建範例】此工件為幾何扭曲懸空結構。建議 FDM 參數：層高 0.12mm、速度 45mm/s。自動化步進馬達建議調校至 6 RPM 慢速掃描以防晃動產生拓撲噪點。",
             "filesize": "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
-            "photo_url": "https://pwmijkkzufcqrnmodxap.supabase.co/storage/v1/object/public/saved_images/OmniSpin%203D%20Scanning%20System.png" # 預設載入超美章魚腳照片封面
+            "photo_url": "fallback_demo" # 範例預設也會使用精美壁紙封面
         }
         clean_list.append(demo_row)
         
     return clean_list
 
 def upload_to_supabase_storage(file_name, file_bytes, bucket="models"):
-    """📦 儲存桶發射器：支援模型模型與實體相片雙通路強行覆蓋上傳"""
+    """📦 儲存桶發射器：使用 PUT 覆蓋更新防禦，全面防止重複衝突"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     rand_id = random.randint(10000, 99999)
     clean_name = file_name.replace(" ", "_")
@@ -112,7 +110,6 @@ def upload_to_supabase_storage(file_name, file_bytes, bucket="models"):
         "Content-Type": "application/octet-stream"
     }
     try:
-        # 🎯 使用 PUT 覆蓋指令，確保絕不因為檔名重複而被 Supabase 擋在門外
         res = requests.put(upload_url, headers=storage_headers, data=file_bytes, timeout=30)
         if res.status_code in [200, 201]:
             return f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/{bucket}/{unique_filename}"
@@ -138,6 +135,7 @@ def ask_gemini_via_http(prompt_text):
 # 🎨 核心主網頁前端 UI 渲染 (經典手動拍照與更名並裝版)
 # ============================================================================== #
 
+# 頂部專題實體 Banner 橫幅
 banner_html = """
 <div style="width: 100%; overflow: hidden; border-radius: 12px; margin-bottom: -10px;">
     <img src="https://pwmijkkzufcqrnmodxap.supabase.co/storage/v1/object/public/saved_images/OmniSpin%203D%20Scanning%20System.png" 
@@ -208,12 +206,12 @@ with tab1:
                 status.write("💾 正在向資料表登錄核心資產數據...")
                 taiwan_now = (datetime.utcnow() + timedelta(hours=8)).isoformat()
                 
-                # 🎯 【終極修復】：filesize 對齊欄位，精準寫入剛才拿到的儲存桶真實短網址
+                # 🎯 filesize 100% 精準寫入對齊真實短網址
                 asset_row = {
                     "filename": file_name, 
                     "timestamp": taiwan_now,  
                     "filesize": model_url,          
-                    "file_path": "", # 初始相片空置
+                    "file_path": "", # 初始相片置空，全自動渲染經典波浪封面
                     "dimensions": bounding_box_str,  
                     "ai_diagnosis": diagnosis_text 
                 }
@@ -259,19 +257,22 @@ with tab1:
                     
                     canvas_slot = st.container()
                     
-                    # 🪐 【左右分流經典排版歸位】：左側放手動更換封面照、右側放幾何數據與更名！
+                    # 🪐 經典雙欄排版回歸
                     photo_col, metric_col = st.columns([1, 1.2])
                     with photo_col:
+                        # 🎯 【視覺絕殺優化】：如果還沒傳照片，自動抓取你最愛的那張高質感橘藍漸層立體波浪預覽圖！
                         if current_photo and str(current_photo).startswith("http"):
-                            st.image(current_photo, caption="📸 現場實體工件預覽封面", use_container_width=True)
+                            st.image(current_photo, caption="📸 現場實體工件封面照", use_container_width=True)
                         else:
-                            st.warning("⚠️ 尚無預覽封面")
+                            # 這是高畫質無水印的立體流線漸層封面圖，跟你的截圖外觀完全嚙合！
+                            st.image("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80", 
+                                     caption="🎨 系統自動擷取預設 3D 封面", use_container_width=True)
                             
-                        # 📸 【功能一：手動更換封面功能】
+                        # 📸 【功能一：手動更換封面照片功能】
                         img_file = st.file_uploader("📷 手動更換封面照片", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
                         if img_file is not None:
                             if st.button("📤 上傳更換照片", key=f"img_btn_{asset_id}", use_container_width=True):
-                                with st.spinner("📦 正在將封面送入 saved_images 儲存桶..."):
+                                with st.spinner("📦 正在將照片空投至 saved_images 儲存桶..."):
                                     p_url = upload_to_supabase_storage(img_file.name, img_file.read(), bucket="saved_images")
                                     if p_url:
                                         requests.patch(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS, json={"file_path": p_url})
@@ -325,7 +326,7 @@ with tab1:
                                 time.sleep(0.5)
                                 st.rerun()
 
-                    # 🎯 展開渲染滑出槽
+                    # 3D 渲染展開槽
                     with canvas_slot:
                         if st.session_state.get(mesh_toggle_key, False) and file_url:
                             if is_usdz:
@@ -370,7 +371,7 @@ with tab1:
                                     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                                 except Exception: st.error("🔺 點雲拓撲還原超時")
 
-                    st.markdown("<hr style='margin: 15px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 10px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
         else:
             st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
     else:
