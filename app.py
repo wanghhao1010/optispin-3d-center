@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [全功能全量大現形・大圓滿完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [全量硬核撈取・大圓滿通車完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -32,7 +32,7 @@ try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
     ai_client = genai.Client(api_key=GEMINI_API_KEY)
 except Exception:
-    # 備用硬編碼防護：若 Streamlit Cloud Secrets 未能即時同步，可於此處直接貼上你的 anon key
+    # 備用防禦：萬一 Streamlit Cloud Secrets 後台漏讀，可在下方手動貼上你的 anon key 長字串
     SUPABASE_KEY = "YOUR_SUPABASE_ANON_KEY_HERE"
     ai_client = None
 
@@ -43,38 +43,44 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 全量釋放流道：精準對齊資料庫現存所有欄位，徹底取消 http 讀取過濾限制"""
+    """🚀 終極破關流道：使用純淨不篩選網址，強行炸開資料庫死結，無條件釋放所有資產！"""
     try:
-        # 🎯 欄位名稱百分之百精準對齊你的 Supabase 後台拼字！
-        fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_diagnosis,vertices,faces"
-        url_new = f"{BASE_URL}{TABLE_NAME}?select={fields}&order=id.desc"
+        # 🎯 【終極殺招】：徹底移除 select= 欄位指定與 order= 排序指定！
+        # 這樣能強迫 Supabase 繞過所有卡死或損壞的資料表索引，以最純粹的物理方式把 44 筆資料全部吐出來！
+        url_new = f"{BASE_URL}{TABLE_NAME}"
         
-        # 工業級防快取標頭，確保手機端不吃舊畫面
         live_headers = HEADERS.copy()
         live_headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         live_headers["Pragma"] = "no-cache"
         
         response = requests.get(url_new, headers=live_headers, timeout=12)
+        
         if response.status_code != 200:
+            st.error(f"🔺 雲端通訊異常！狀態碼: {response.status_code} | 原因: {response.text}")
             return []
             
         raw_list = response.json()
+        
+        if len(raw_list) == 0:
+            st.warning("⚠️ 資料庫目前無回應，請確認資料表內容。")
+            return []
+            
         clean_list = []
         for row in raw_list:
             fsize_val = row.get("filesize", "")
             fsize_str = str(fsize_val) if fsize_val else ""
             
-            # 🎯 歷史 Base64 巨量文字舊資料防爆降載：長度過長則清空網址防 500 Timeout
-            # 其餘不管是 NULL 還是 Storage 短網址通通無條件放行，絕不在這裡把 row 過濾掉！
+            # 🎯 歷史 Base64 巨大文字髒資料防爆安全降載
             if len(fsize_str) > 1000:
                 final_url = ""
             else:
                 final_url = fsize_str
                 
+            # 從資料庫撈取真正的欄位拼字，並映射到前台安全字典
             safe_row = {
                 "id": row.get("id", 0),
                 "filename": row.get("filename") if row.get("filename") else "未命名數位雙生資產",
-                "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "timestamp": str(row.get("timestamp", ""))[:16].replace("T", " ") if row.get("timestamp") else "2026-06-14 00:00",
                 "vertices": int(row.get("vertices")) if row.get("vertices") is not None else 45000,  
                 "faces": int(row.get("faces")) if row.get("faces") is not None else 90000,
                 "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
@@ -82,12 +88,16 @@ def fetch_lightweight_assets():
                 "filesize": final_url
             }
             clean_list.append(safe_row)
+            
+        # 🎯 【記憶體內自主排序】：資料庫不幫我們排，我們用 Python 在記憶體裡自己依照 id 降序排列，速度極快且絕不卡死！
+        clean_list.sort(key=lambda x: x["id"], reverse=True)
         return clean_list
-    except Exception:
+    except Exception as e:
+        st.error(f"🔺 物理連線層嚴重異常: {str(e)}")
         return []
 
 def upload_to_supabase_storage(file_name, file_bytes):
-    """📦 儲存桶發射器：強行將實體圖檔送上 Storage models 儲存桶"""
+    """📦 儲存桶發射器：將實體圖檔送上 Storage"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     unique_filename = f"{timestamp_prefix}_{file_name}"
     upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
@@ -106,7 +116,7 @@ def upload_to_supabase_storage(file_name, file_bytes):
         return ""
 
 # ============================================================================== #
-# 🎨 核心前端 UI 渲染層 (分頁雙軌完全並裝)
+# 🎨 核心主網頁前端 UI 渲染 (分頁全量打包並裝)
 # ============================================================================== #
 
 st.title("🛸 OptiSpin 3D 控制中心")
@@ -114,11 +124,11 @@ st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生管理�
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
-# 現場即時撈取名單
+# 現場即時輕量拉取數據
 cloud_data = fetch_lightweight_assets()
 
 # ------------------------------------------------------------------------------ #
-# 分頁一：3D 大數據資產管理端 (上傳與資產動態搜尋倉儲)
+# 分頁一：3D 大數據資產管理端
 # ------------------------------------------------------------------------------ #
 with tab1:
     st.subheader("📥 點擊或拖曳上傳全新 3D 掃描模型")
@@ -136,7 +146,6 @@ with tab1:
             st.session_state["upload_triggered"] = True
             st.rerun()
 
-    # 核心非同步耗時同步流道，保障手機端 Websocket 不中斷卡死
     if st.session_state["upload_triggered"] and uploaded_file is not None:
         with st.status("🛸 雲端數位雙生大數據同步中...", expanded=True) as status:
             try:
@@ -144,11 +153,10 @@ with tab1:
                 file_name = uploaded_file.name
                 file_extension = os.path.splitext(file_name)[1].lower()
                 
-                # 賦予安全預設常數，避免手機網速微幅延遲導致連線被 Streamlit 掐斷
                 vertices_count, faces_count = 45000, 90000
                 bounding_box_str = "180.0 x 120.0 x 160.0 mm"
                 
-                # 💡 格式分流解析：非 usdz 的工業標準格式才調用 trimesh 硬核計算幾何資訊
+                # 💡 格式分流幾何拓撲解析：非 usdz 的工業標準格式才調用 trimesh 計算
                 if file_extension in [".obj", ".stl", ".glb"]:
                     try:
                         file_stream = io.BytesIO(file_bytes)
@@ -161,28 +169,27 @@ with tab1:
                             bounding_box_str = f"{bbox[0]:.1f} x {bbox[1]:.1f} x {bbox[2]:.1f} mm"
                     except Exception: pass
                 
-                status.write("📦 正在將實體 3D 圖檔空投送入雲端儲存桶...")
+                status.write("📦 正在將實體圖檔空投至 Supabase Storage 儲存桶...")
                 model_url = upload_to_supabase_storage(file_name, file_bytes)
                 if not model_url:
-                    # 容錯防禦路徑補齊
                     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
                     model_url = f"{STORAGE_URL}{timestamp_prefix}_{file_name}"
 
-                status.write("🤖 正在調度 Gemini 專家系統生成 FDM 工藝評估報告...")
+                status.write("🤖 正在調度 Gemini 專家系統生成 FDM 生成式工藝報告...")
                 try:
-                    prompt_analysis = f"工件檔名 {file_name}，請給予 100 字內 FDM PLA/PETG 列印速度與步進馬達調校建議。"
+                    prompt_analysis = f"工件檔名 {file_name}，網格面數 {faces_count}。請給予 100 字內 FDM PLA/PETG 列印速度建議。"
                     ai_response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[prompt_analysis])
                     diagnosis_text = ai_response.text
                 except Exception: 
                     diagnosis_text = "精密工件收錄成功。已調度 FDM 生成式工藝評估報告。"
 
-                status.write("💾 正在向雲端資料表登錄精密對齊數據...")
+                status.write("💾 正在向資料表登錄精密數據欄位...")
                 asset_row = {
                     "filename": file_name, 
                     "vertices": int(vertices_count), 
                     "faces": int(faces_count),
                     "dimensions": bounding_box_str,  
-                    "ai_diagnosis": diagnosis_text, # 對齊資料表真實欄位拼字拼寫
+                    "ai_diagnosis": diagnosis_text, # 精準對齊資料庫真正的欄位拼寫
                     "filesize": model_url,          
                     "file_path": file_name,
                     "timestamp": datetime.now().isoformat() 
@@ -206,7 +213,7 @@ with tab1:
                 st.session_state["upload_triggered"] = False
                 st.stop()
 
-    # 🔍 3D 雲端資產搜尋與渲染儀表板
+    # 🔍 3D 雲端資產動態搜尋倉儲
     st.markdown("---")
     total_count = len(cloud_data) if cloud_data else 0
     st.subheader(f"🔍 3D 雲端資產動態搜尋倉儲 (目前雲端總計: {total_count} 筆)")
@@ -236,7 +243,7 @@ with tab1:
 
                     view_col1, view_col2, del_col = st.columns([1.2, 1.2, 1])
                     
-                    # 🪐 雙軌分流控制鈕：取消 startswith http 限制，全量無條件大方亮起！
+                    # 🪐 核心按鈕控制：解鎖所有過濾限制，只要是合法短網址，通通強制亮起！
                     with view_col1:
                         if file_url and str(file_url).startswith("http"):
                             if st.button(f"🛰️ 實體全貼圖", key=f"btn_m_{asset_id}", use_container_width=True):
@@ -262,9 +269,8 @@ with tab1:
                             time.sleep(0.5)
                             st.rerun()
 
-                    # 🎯 核心分流展開渲染區
+                    # 🎯 格式動態分流渲染
                     with canvas_slot:
-                        # 通道 A：3D 實體/iOS AR 投放展開
                         if st.session_state.get(mesh_toggle_key, False) and file_url:
                             if is_usdz:
                                 st.success("🍏 已切換至 iOS 原生 AR 空間投放安全通路！")
@@ -283,12 +289,10 @@ with tab1:
                                 """
                                 st.components.v1.html(html_canvas, height=330)
 
-                        # 通道 B：高科技單色點雲矩陣逆向還原展開
                         if st.session_state.get(pc_toggle_key, False) and file_url:
                             with st.spinner("🌌 正在從雲端數據庫逆向還原拓撲點雲..."):
                                 try:
                                     if is_usdz:
-                                        # 🍏 針對 USDZ 的演算法降維分流作法：現場利用幾何特徵矩陣，瞬時生成粒子點雲
                                         t = np.linspace(0, 2*np.pi, 900)
                                         x = np.sin(t) * np.cos(t*12) * 45
                                         y = np.cos(t) * np.cos(t*12) * 45
@@ -296,7 +300,6 @@ with tab1:
                                         base_pts = np.column_stack((x, y, z))
                                         pts = base_pts + np.random.normal(0, 3.5, base_pts.shape)
                                     else:
-                                        # 🛠️ 針對工業標準 GLB，維持硬核連線下載、解算頂點陣列
                                         res_file = requests.get(file_url, timeout=15)
                                         scene_or_m = trimesh.load(io.BytesIO(res_file.content), file_type='glb')
                                         c_mesh = list(scene_or_m.geometry.values())[0] if isinstance(scene_or_m, trimesh.Scene) else scene_or_m
@@ -308,33 +311,27 @@ with tab1:
                                     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                                 except Exception: 
                                     st.error("🔺 點雲拓撲還原超時")
-                    st.markdown("<div style='margin-bottom:25px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 10px 0; border-top: 1px dashed #bbb;'>", unsafe_allow_html=True)
         else:
             st.info("💡 沒有符合當前搜尋關鍵字的 3D 資產。")
     else:
-        st.info("📦 當前雲端倉儲尚無資產，請於上方上傳首個 3D 模型檔案。")
+        st.info("📦 當前雲端大數據倉儲尚無任何資產，請於上方上傳首個 3D 模型檔案。")
 
 # ------------------------------------------------------------------------------ #
-# 分頁二：Scaniverse 智慧診斷日誌 (【大數據跨資產綜合 AI 分析中心】)
+# 分頁二：Scaniverse 智慧診斷日誌
 # ------------------------------------------------------------------------------ #
 with tab2:
     st.subheader("🤖 大數據中心跨資產綜合分析日誌")
     if cloud_data:
-        # 自動捕捉排名前 3 筆最新的 3D 資產名稱建立脈絡
         recent_assets = cloud_data[:3]
         assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')}" for index, item in enumerate(recent_assets)]
         all_assets_context = "\n".join(assets_summary_list)
-        
         if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
-            with st.spinner("🤖 正在調度 Gemini 專家系統進行跨資產趨勢分析..."):
+            with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
                 try:
-                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據趨勢並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
+                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據 trends 並給予自動化步進馬達與 FDM 列印速度調校建議：\n{all_assets_context}"
                     response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=[intelligence_prompt])
                     st.session_state["cached_diagnostic_report"] = response.text
-                except Exception: 
-                    st.error("🧠 雲端運作繁忙，綜合報告生成超時，請稍候再試。")
-                    
+                except Exception: st.error("🧠 雲端繁忙，請稍候再試。")
         if "cached_diagnostic_report" in st.session_state:
             st.markdown(f"<div style='background-color:#2a2a2a; padding:15px; border-radius:10px; color:#ffffff;'>{st.session_state['cached_diagnostic_report']}</div>", unsafe_allow_html=True)
-    else:
-        st.info("💡 雲端目前缺乏資產背景，請於分頁一完成上傳後再行調度 AI 診斷。")
