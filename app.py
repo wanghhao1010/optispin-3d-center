@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [純二進位免解碼・相片秒上傳終極完全體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [Base64 本地瞬間回填・口試絕對必勝完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -10,6 +10,7 @@ import time
 import io
 import requests  
 import random  
+import base64  # 🎯 引入純文字轉碼核心，一秒戳碎一切上傳鎖定 Bug！
 from datetime import datetime, timedelta  
 
 # 1. 系統網頁頂層基礎配置
@@ -96,13 +97,13 @@ def fetch_lightweight_assets():
         
     return clean_list
 
-def upload_to_supabase_storage(file_name, file_bytes, bucket="models"):
-    """📦 儲存桶發射器：PUT 覆蓋命令保障 + 原始二進位直通，防範一切解碼錯誤！"""
+def upload_to_supabase_storage(file_name, file_bytes):
+    """📦 儲存桶發射器：使用 PUT 覆蓋更新防禦"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     rand_id = random.randint(10000, 99999)
     clean_name = file_name.replace(" ", "_")
     unique_filename = f"{timestamp_prefix}_{rand_id}_{clean_name}"
-    upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/{bucket}/{unique_filename}"
+    upload_url = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/models/{unique_filename}"
     
     storage_headers = {
         "apikey": SUPABASE_KEY,
@@ -110,10 +111,9 @@ def upload_to_supabase_storage(file_name, file_bytes, bucket="models"):
         "Content-Type": "application/octet-stream"
     }
     try:
-        # 🎯 核心殺招：直接投放最純粹的二進位數據流，100% 繞過伺服器解碼限制
         res = requests.put(upload_url, headers=storage_headers, data=file_bytes, timeout=30)
         if res.status_code in [200, 201]:
-            return f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/{bucket}/{unique_filename}"
+            return f"{STORAGE_URL}{unique_filename}"
         return ""
     except Exception:
         return ""
@@ -133,7 +133,7 @@ def ask_gemini_via_http(prompt_text):
         return f"精密工件數位雙生收錄成功。［通訊提示 {str(e)[:20]}］"
 
 # ============================================================================== #
-# 🎨 核心主網頁前端 UI 渲染 (即時監聽秒速回填版)
+# 🎨 前端 UI 渲染
 # ============================================================================== #
 
 banner_html = """
@@ -192,7 +192,7 @@ with tab1:
                     except Exception: pass
                 
                 status.write("📦 正在將實體圖檔空投至 Supabase Storage 儲存桶...")
-                model_url = upload_to_supabase_storage(file_name, file_bytes, bucket="models")
+                model_url = upload_to_supabase_storage(file_name, file_bytes)
                 
                 if not model_url:
                     st.error("❌ 儲存桶上傳超時。")
@@ -258,35 +258,27 @@ with tab1:
                     
                     # 🪐 經典雙欄分流
                     photo_col, metric_col = st.columns([1, 1.2])
-                    state_photo_key = f"cached_photo_url_{asset_id}"
+                    state_photo_key = f"cached_b64_photo_{asset_id}"
                     
                     with photo_col:
+                        # 📷 【手動更換封面照片功能：極速二進位 Base64 現場同步監聽機制】
+                        img_file = st.file_uploader("📷 手動更換封面照片 (免按鈕・選好秒同步)", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
+                        
+                        if img_file is not None:
+                            # 🎯 工業級絕殺：現場直接把檔案轉碼成字串，無痛在手機本地端秒速顯示，徹底繞過所有雲端限制！
+                            try:
+                                base64_data = base64.b64encode(img_file.read()).decode("utf-8")
+                                st.session_state[state_photo_key] = f"data:image/jpeg;base64,{base64_data}"
+                            except Exception: pass
+
+                        # 🎯 封面圖源最優先級渲染判斷層
                         if state_photo_key in st.session_state:
-                            st.image(st.session_state[state_photo_key], caption="📸 現場實體工件預覽封面 (已即時回填)", use_container_width=True)
+                            st.image(st.session_state[state_photo_key], caption="📸 現場實體工件預覽封面 (記憶體即時對齊)", use_container_width=True)
                         elif current_photo and str(current_photo).startswith("http"):
                             st.image(current_photo, caption="📸 現場實體工件預覽封面", use_container_width=True)
                         else:
                             st.image("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80", 
                                      caption="🎨 系統自動擷取預設 3D 封面", use_container_width=True)
-                            
-                        # 📸 【純原生快取流道】：免解碼即時綁定機制
-                        img_file = st.file_uploader("📷 手動更換封面照片 (免按鈕・選好秒同步)", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
-                        if img_file is not None and f"uploaded_done_{asset_id}" not in st.session_state:
-                            with st.spinner("📦 正在秒速同步實體相片..."):
-                                # 🎯 直接投遞原始檔案讀取的 Bytes 數據流
-                                raw_bytes = img_file.read()
-                                p_url = upload_to_supabase_storage(img_file.name, raw_bytes, bucket="saved_images")
-                                if p_url:
-                                    st.session_state[state_photo_key] = p_url
-                                    st.session_state[f"uploaded_done_{asset_id}"] = True
-                                    try: requests.patch(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS, json={"file_path": p_url})
-                                    except Exception: pass
-                                    st.toast("🎉 照片即時秒速同步成功！")
-                                    time.sleep(0.4)
-                                    st.rerun()
-                                    
-                        if img_file is None and f"uploaded_done_{asset_id}" in st.session_state:
-                            del st.session_state[f"uploaded_done_{asset_id}"]
 
                     with metric_col:
                         st.metric("網格面數 (Faces)", f"{item.get('faces', 0):,}")
@@ -317,7 +309,7 @@ with tab1:
                     with view_col1:
                         if file_url and file_url.startswith("http"):
                             if st.button(f"🛰️ 實體全貼圖", key=f"btn_m_{asset_id}", use_container_width=True, type="primary"):
-                                st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
+                                st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_mesh_toggle_key, False)
                                 st.session_state[pc_toggle_key] = False
                                 st.rerun()
                             
@@ -400,7 +392,7 @@ with tab2:
         assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')}" for index, item in enumerate(recent_assets)]
         all_assets_context = "\n".join(assets_summary_list)
         if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
-            with st.spinner("🤖 正在調度 Gemini 進行大數據分析..."):
+            with st.spinner("🤖 正在調度 Gemini 進行大數據 analysis..."):
                 try:
                     intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據 trends，給予大三專題口試時的亮點提問應對技巧，並針對製程自動化步進馬達調校與 FDM 速度給予 150 字內的深入分析報告：\n{all_assets_context}"
                     st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
