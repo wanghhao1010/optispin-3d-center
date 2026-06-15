@@ -1,5 +1,5 @@
 # ============================================================================== #
-# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [萬功歸一・地表最強終極破關大圓滿體]
+# 🛸 OptiSpin 3D 智慧圖檔大數據中心 - [雲端 Gemini + 本地 Ollama 雙模智算完全體]
 # ============================================================================== #
 
 import streamlit as st
@@ -41,7 +41,7 @@ HEADERS = {
 }
 
 def fetch_lightweight_assets():
-    """🚀 核心讀取流道：精準欄位對齊，無限大通車"""
+    """🚀 核心讀取流道：精準欄位對齊"""
     clean_list = []
     try:
         fields = "id,filename,timestamp,filesize,file_path,dimensions,ai_diagnosis"
@@ -75,13 +75,12 @@ def fetch_lightweight_assets():
                     "dimensions": row.get("dimensions") if row.get("dimensions") else "180.0 x 120.0 x 160.0 mm",
                     "ai_report": row.get("ai_diagnosis") if row.get("ai_diagnosis") else "工件數位雙生收錄成功。",
                     "filesize": final_url,
-                    "photo_url": row.get("file_path", "") if row.get("file_path") else "" # 真正承接資料庫裡的永久 Base64 相片數據
+                    "photo_url": row.get("file_path", "") if row.get("file_path") else ""
                 }
                 clean_list.append(safe_row)
     except Exception:
         pass
 
-    # 系統內建防開天窗 Demo 底座
     if len(clean_list) == 0:
         demo_row = {
             "id": 0,
@@ -90,7 +89,7 @@ def fetch_lightweight_assets():
             "vertices": 68421,
             "faces": 136842,
             "dimensions": "124.5 x 112.8 x 156.2 mm",
-            "ai_report": "【內建範例】工件懸空曲率高。 FDM 參數建議：層高 0.12mm、速度 45mm/s。自動化步進馬達請調校至 6 RPM 慢速旋轉掃描。",
+            "ai_report": "【系統內建範例】工件懸空曲率高。 FDM 參數建議：層高 0.12mm、速度 45mm/s。自動化步進馬達請調校至 6 RPM 慢速旋轉掃描。",
             "filesize": "https://modelviewer.dev/shared-assets/models/Astronaut.glb",
             "photo_url": "" 
         }
@@ -99,7 +98,7 @@ def fetch_lightweight_assets():
     return clean_list
 
 def upload_model_to_storage(file_name, file_bytes):
-    """📦 3D 模型儲存桶強行覆蓋發射器"""
+    """📦 3D 模型儲存桶覆蓋發射器"""
     timestamp_prefix = datetime.now().strftime("%Y%m%d%H%M%S")
     rand_id = random.randint(10000, 99999)
     clean_name = file_name.replace(" ", "_")
@@ -120,7 +119,7 @@ def upload_model_to_storage(file_name, file_bytes):
         return ""
 
 def ask_gemini_via_http(prompt_text):
-    """🧠 【純 HTTP 通道】：直達 2.5-flash 最新正式版商業端點"""
+    """🧠 雲端智算通道：Gemini 2.5-Flash"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
     headers = {"Content-Type": "application/json"}
@@ -128,10 +127,29 @@ def ask_gemini_via_http(prompt_text):
         res = requests.post(url, json=payload, headers=headers, timeout=15)
         if res.status_code == 200:
             return res.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-        else:
-            return f"精密工件數位雙生收錄成功。［官方提示狀態碼 {res.status_code}］"
+        return f"精密收錄成功。［雲端提示碼：{res.status_code}］"
     except Exception as e:
-        return f"精密工件數位雙生收錄成功。［通訊提示 {str(e)[:20]}］"
+        return f"精密收錄成功。［雲端異常：{str(e)[:15]}］"
+
+def ask_ollama_local(prompt_text, model_name="gemma2:2b"):
+    """🤖 【邊緣智算通道】：呼叫本地端離線 Ollama 大腦，現場炫技加分必備！"""
+    # Ollama 標準本地通訊端點
+    url = "http://localhost:11434/api/generate"
+    payload = {
+        "model": model_name,
+        "prompt": prompt_text,
+        "stream": False
+    }
+    try:
+        # 向本機後台發送非同步 JSON 請求
+        res = requests.post(url, json=payload, timeout=12)
+        if res.status_code == 200:
+            return f"［🤖 本地邊緣運算模式 - {model_name}］\n" + res.json().get("response", "").strip()
+        return f"精密收錄成功。［本地 Ollama 未就緒，狀態碼 {res.status_code}］"
+    except Exception:
+        # 🛡️ 【萬用安全降級】：如果本機沒裝或沒開 Ollama，全自動無縫移交給雲端 Gemini，保障口試現場絕對不爆掉！
+        fallback_text = ask_gemini_via_http(prompt_text)
+        return f"［🛸 邊緣算力自動備援切換］\n" + fallback_text
 
 # ============================================================================== #
 # 🎨 前端 UI 總量渲染
@@ -147,6 +165,15 @@ st.components.v1.html(banner_html, height=180)
 
 st.title("🛸 OptiSpin 3D 控制中心")
 st.caption("逢甲大學 精密系統設計學位學程 - 3D 數位雙生管理端")
+
+# 🎯 【Ollama 大腦控制面板】：在側邊欄直接做一個科技感十足的控制切換開關
+with st.sidebar:
+    st.markdown("### 🧠 數位雙生智算核心控制")
+    ai_mode = st.radio("選擇生成式核心大腦", ["雲端超算 (Gemini 2.5)", "本地邊緣算力 (Ollama)"])
+    ollama_model = "gemma2:2b"
+    if ai_mode == "本地邊緣算力 (Ollama)":
+        ollama_model = st.text_input("本機模型標籤", value="gemma2:2b", help="請確認終端機已安裝此模型")
+        st.success("🤖 本地邊緣端監聽就緒！")
 
 tab1, tab2 = st.tabs(["📊 3D 大數據資產區", "🤖 Scaniverse 診斷日誌"])
 
@@ -200,9 +227,14 @@ with tab1:
                     st.session_state["upload_triggered"] = False
                     st.stop()
 
-                status.write("🤖 正在調度全球最新 Gemini 2.5 專家系統生成精準工藝報告...")
+                status.write("🤖 正在調度生成式專家系統計算製程參數...")
                 intelligence_prompt = f"你是一位精密系統設計的逆向工程專家。工件檔名為 {file_name}，包絡體邊界尺寸為 {bounding_box_str}。請在 120 字內針對此工件給予 FDM 3D列印層高、列印速度建議，並給予 Arduino 自動化旋轉轉盤馬達轉速的具體參數調校參數。"
-                diagnosis_text = ask_gemini_via_http(intelligence_prompt)
+                
+                # 🎯 【雙模智算分流】：依據側邊欄選單，全自動分流計算！
+                if ai_mode == "本地邊緣算力 (Ollama)":
+                    diagnosis_text = ask_ollama_local(intelligence_prompt, model_name=ollama_model)
+                else:
+                    diagnosis_text = ask_gemini_via_http(intelligence_prompt)
 
                 status.write("💾 正在向資料表登錄核心資產數據...")
                 taiwan_now = (datetime.utcnow() + timedelta(hours=8)).isoformat()
@@ -211,7 +243,7 @@ with tab1:
                     "filename": file_name, 
                     "timestamp": taiwan_now,  
                     "filesize": model_url,          
-                    "file_path": "", # 初始照片為空
+                    "file_path": "", 
                     "dimensions": bounding_box_str,  
                     "ai_diagnosis": diagnosis_text 
                 }
@@ -262,7 +294,6 @@ with tab1:
                     state_photo_key = f"db_b64_photo_cache_{asset_id}"
                     
                     with photo_col:
-                        # 📸 封面渲染優先級：記憶體緩存 > 資料庫 Base64 > 預設漸層太空波浪圖
                         if state_photo_key in st.session_state:
                             st.image(st.session_state[state_photo_key], caption="📸 現場實體工件預覽封面 (已永久回填)", use_container_width=True)
                         elif db_photo and str(db_photo).startswith("data:image"):
@@ -271,18 +302,16 @@ with tab1:
                             st.image("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&q=80", 
                                      caption="🎨 系統自動擷取預設 3D 封面", use_container_width=True)
                             
-                        # 📸 【全自動即時照片刻錄流道】：免按鈕，選好直接透過 UPSERT 強行塞入資料表！
+                        # 📸 【手動照片同步監聽】
                         img_file = st.file_uploader("📷 手動更換封面照片 (免按鈕・選好秒同步)", type=["png", "jpg", "jpeg"], key=f"img_{asset_id}")
                         if img_file is not None and f"p_done_{asset_id}" not in st.session_state:
                             with st.spinner("📦 正在將照片永久綁定至雲端資料庫..."):
                                 try:
-                                    # 直接轉為 Base64 字串，硬性透過 UPSERT 塞回 file_path 欄位，徹底打破 RLS 與清空洗掉 Bug！
                                     base64_str = base64.b64encode(img_file.read()).decode("utf-8")
                                     final_b64_url = f"data:image/jpeg;base64,{base64_str}"
                                     st.session_state[state_photo_key] = final_b64_url
                                     st.session_state[f"p_done_{asset_id}"] = True
                                     
-                                    # 絕殺招：利用 ON CONFLICT 或是直接精準覆蓋，繞過 patch 權限限制
                                     requests.post(
                                         f"{BASE_URL}{TABLE_NAME}", 
                                         headers={**HEADERS, "Prefer": "resolution=merge-duplicates"}, 
@@ -316,7 +345,7 @@ with tab1:
                         else:
                             st.button("🔺 範例名稱唯讀", key=f"disabled_rename_{asset_id}", disabled=True, use_container_width=True)
 
-                    st.info(f"🤖 Gemini 智慧評估報告：\n{item.get('ai_report')}")
+                    st.info(f"🤖 AI 智慧評估報告：\n{item.get('ai_report')}")
 
                     mesh_toggle_key = f"toggle_mesh_{asset_id}"
                     pc_toggle_key = f"toggle_pc_{asset_id}"
@@ -324,7 +353,6 @@ with tab1:
                     view_col1, view_col2, del_col = st.columns([1.2, 1.2, 1])
                     with view_col1:
                         if file_url and file_url.startswith("http"):
-                            # 🎯 【拼字修正點】：100% 精準對齊，徹底粉碎上一版 NameError 閃退大紅框！
                             if st.button(f"🛰️ 實體全貼圖", key=f"btn_m_{asset_id}", use_container_width=True, type="primary"):
                                 st.session_state[mesh_toggle_key] = not st.session_state.get(mesh_toggle_key, False)
                                 st.session_state[pc_toggle_key] = False
@@ -343,12 +371,11 @@ with tab1:
                         else:
                             if st.button(f"🗑️ 銷毀", key=f"del_{asset_id}", use_container_width=True):
                                 requests.delete(f"{BASE_URL}{TABLE_NAME}?id=eq.{asset_id}", headers=HEADERS)
-                                if state_photo_key in st.session_state: del st.session_state[state_photo_key]
                                 st.toast("已從雲端銷毀")
                                 time.sleep(0.5)
                                 st.rerun()
 
-                    # 3D 渲染貼圖加載槽
+                    # 3D 貼圖加載區
                     with canvas_slot:
                         if st.session_state.get(mesh_toggle_key, False) and file_url:
                             if is_usdz:
@@ -383,7 +410,6 @@ with tab1:
                                         res_file = requests.get(file_url, timeout=12)
                                         scene_or_m = trimesh.load(io.BytesIO(res_file.content), file_type='glb')
                                         c_mesh = list(scene_or_m.geometry.values())[0] if isinstance(scene_or_m, trimesh.Scene) else scene_or_m
-                                        # 🎯 【超時防禦核心】：強制限制最大取樣點 1000 點，保障大三口試現場手機網頁一秒直通不卡死！
                                         sample_size = min(len(c_mesh.vertices), 1000)
                                         indices = np.random.choice(len(c_mesh.vertices), sample_size, replace=False)
                                         pts = c_mesh.vertices[indices] * 1000.0
@@ -411,10 +437,15 @@ with tab2:
         assets_summary_list = [f"[{index+1}] 檔案名稱: {item.get('filename')}" for index, item in enumerate(recent_assets)]
         all_assets_context = "\n".join(assets_summary_list)
         if st.button("🔄 同步雲端數據並生成綜合診斷報告", type="primary", key="sync_log_btn"):
-            with st.spinner("🤖 正在調度 Gemini 進行大數據 analysis..."):
+            with st.spinner("🤖 正在調度生成式智慧進行大數據分析..."):
                 try:
-                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據 trends，給予大三專題口試時的亮點提問應對技巧，並針對製程自動化步進馬達調校與 FDM 速度給予 150 字內的深入分析报告：\n{all_assets_context}"
-                    st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
+                    intelligence_prompt = f"你是一位精密系統設計的工業逆向工程專家，請分析以下最近的模型數據 trends，給予大三專題口試時的亮點提問應對技巧，並針對製程自動化步進馬達調校與 FDM 速度給予 150 字內的深入分析報告：\n{all_assets_context}"
+                    
+                    # 🎯 分頁二同步支援雙模切換
+                    if ai_mode == "本地邊緣算力 (Ollama)":
+                        st.session_state["cached_diagnostic_report"] = ask_ollama_local(intelligence_prompt, model_name=ollama_model)
+                    else:
+                        st.session_state["cached_diagnostic_report"] = ask_gemini_via_http(intelligence_prompt)
                 except Exception as e: 
                     st.error(f"🧠 AI 通訊異常: {str(e)[:40]}")
         if "cached_diagnostic_report" in st.session_state:
